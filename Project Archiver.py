@@ -2,6 +2,7 @@
 #Description-This is sample addin.
 
 import adsk.core, adsk.fusion, traceback
+import os
 
 MAX_PROJECTS = 10
         
@@ -10,6 +11,7 @@ commandDescription = 'Project Archiver'
 commandResources = './resources'
 
 cmdId = 'projectCommandOnPanel'
+
 
 # global set of event handlers to keep them referenced for the duration of the command
 handlers = []
@@ -50,7 +52,15 @@ def exportFolder(rootFolder, outputFolder):
         exportFolder(folder, outputFolder)
     for file in rootFolder.dataFiles:
         openDoc(file, outputFolder)
- 
+
+def dupCheck(name):
+    if os.path.exists(name):
+        base, ext = os.path.splitext(name)
+        base += '-dup'
+        name = base + ext
+    return name
+        
+
 def exportActiveDoc(outputFolder):
 
     app = adsk.core.Application.get()
@@ -58,6 +68,7 @@ def exportActiveDoc(outputFolder):
     exportMgr = design.exportManager
 
     export_name = outputFolder + app.activeDocument.name + '.stp'
+    export_name = dupCheck(export_name)
     exportOptions = exportMgr.createSTEPExportOptions(export_name)
     exportMgr.execute(exportOptions)
 
@@ -176,7 +187,6 @@ def run(context):
                     currentProject = 0
                     for project in allProjects:
                         if project is not None:
-                            
                             projectSelect.listItems.add(project.name, False)
                             currentProject += 1
                             if currentProject >= MAX_PROJECTS:
