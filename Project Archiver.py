@@ -58,6 +58,7 @@ def dupCheck(name):
         base, ext = os.path.splitext(name)
         base += '-dup'
         name = base + ext
+        dupCheck(name)
     return name
         
 
