@@ -2,10 +2,8 @@
 #Description-This is sample addin.
 
 import adsk.core, adsk.fusion, traceback
-from os.path import expanduser
-import os
 
-
+MAX_PROJECTS = 10
         
 commandName = 'ProjectArchiver'
 commandDescription = 'Project Archiver'
@@ -15,21 +13,6 @@ cmdId = 'projectCommandOnPanel'
 
 # global set of event handlers to keep them referenced for the duration of the command
 handlers = []
-
-def getFileName():
-
-    # Get Home directory
-    home = expanduser("~")
-    home += '/OctoFusion/'
-    
-    # Create if doesn't exist
-    if not os.path.exists(home):
-        os.makedirs(home)
-    
-    # Create file name in this path
-    xmlFileName = home  + 'settings.xml'
-    return xmlFileName
-
     
 def commandDefinitionById(id):
     app = adsk.core.Application.get()
@@ -80,17 +63,19 @@ def exportActiveDoc(outputFolder):
 
 def openDoc(dataFile, outputFolder):
     app = adsk.core.Application.get()
-    ui = app.userInterface
-
+    
     try:
         document = app.documents.open(dataFile, True)
-        document.activate()
-        exportActiveDoc(outputFolder)
-        document.close(False)
+        if document is not None:
+            document.activate()
+            exportActiveDoc(outputFolder)
+            
+            # Causes Fusion 360 to crash?
+            # document.close(False)
     except:
         pass
-       
-    
+
+
 def run(context):
     ui = None
     try:
@@ -152,9 +137,7 @@ def run(context):
                                 exportProject = project
                                 break
                     exportFolder(exportProject.rootFolder, outputPath)
-
-                                     
-                    
+                
                 except:
                     if ui:
                         ui.messageBox('command executed failed: {}'.format(traceback.format_exc()))
@@ -190,14 +173,13 @@ def run(context):
                     app = adsk.core.Application.get()
                     allProjects = app.data.dataProjects
                     
-                    maxProjects = 4
                     currentProject = 0
                     for project in allProjects:
                         if project is not None:
                             
                             projectSelect.listItems.add(project.name, False)
                             currentProject += 1
-                            if currentProject > maxProjects:
+                            if currentProject >= MAX_PROJECTS:
                                 break
 
 
