@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8"/>
+</head>
+<body>
+<h1>Project-Archiver</h1>
+
+<p>The archiver script will open all Fusion 360 3D data in a project and export it as STEP to a local location of your choosing. </p>
+
+<p><a href="#How-to-Install">How to install</a><br/>
+<a href="#How-to-Use">How to use</a></p>
+
+<h3>How to install</h3>
+
+<h4>Windows</h4>
+
+<p>Download the REPO. </p>
+
+<ol>
+<li>Click Clone or <em>Download</em></li>
+<li>Click <em>Download Zip</em></li>
+</ol>
+
+<figure>
+<img src="resources/download.png" alt="download" />
+<figcaption>download</figcaption>
+</figure>
+
+<ol>
+<li><p>Un-Zip to any convient location.</p></li>
+<li><p>Copy the data to: %AppData%\Autodesk\Autodesk Fusion 360\API\AddIns</p></li>
+<li><p>You should then see:</p></li>
+</ol>
+
+<figure>
+<img src="resources/windows-result.png" alt="win_result" />
+<figcaption>win_result</figcaption>
+</figure>
+
+<h4>MAC OS</h4>
+
+<p>Download the REPO. </p>
+
+<ol>
+<li>Click Clone or <strong>Download</strong></li>
+<li>Click <strong>Download Zip</strong></li>
+</ol>
+
+<figure>
+<img src="resources/download.png" alt="download" />
+<figcaption>download</figcaption>
+</figure>
+
+<ol>
+<li><p>Un-Zip to any convient location.</p></li>
+<li><p>Copy the data to: ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns</p></li>
+<li><p>You should then see:</p></li>
+</ol>
+
+<figure>
+<img src="resources/osx-result.png" alt="osx_result" />
+<figcaption>osx_result</figcaption>
+</figure>
+
+<h3>Fusion 360</h3>
+
+<ol>
+<li><p>Launch Fusion 360.</p></li>
+<li><p>On the main toolbar click the <strong>Scripts and Addins</strong> button in the <strong>Addins</strong> Pane</p>
+
+<figure>
+<img src="resources/scripts-addins.png" alt="Scripts" />
+<figcaption>Scripts</figcaption>
+</figure></li>
+<li><p>Select the <strong>Addins tab</strong> and find the Archive-Exporter. </p></li>
+<li><p>Click <strong>Run at startup</strong>. </p></li>
+<li><p>Click run. </p>
+
+<figure>
+<img src="resources/archiver-addin.png" alt="addin" />
+<figcaption>addin</figcaption>
+</figure></li>
+<li><p>Dismiss the Addins dialog. </p></li>
+<li><p>On the main toolbar click the <strong>Scripts and Addins</strong> menu and you should see <strong>Archive-Exporter</strong> Pane.</p>
+
+<figure>
+<img src="resources/button.png" alt="addin" />
+<figcaption>addin</figcaption>
+</figure></li>
+</ol>
+
+<h3>How to use</h3>
+
+<p>Launch Fusion 360.
+Under the <strong>Scripts and Addins</strong> select Arcive-export.
+After a time ( could be a long time ) a dialog will open with a list of projects. The more projects you have the longer this will take.</p>
+
+<figure>
+<img src="resources/dialog.png" alt="dialog" />
+<figcaption>dialog</figcaption>
+</figure>
+
+<p>The dialog promts you to choose a project. From the <strong>Select Project</strong> drop down choose a project.
+It then allows you to enter a path. Type in a path into the <strong>Output Path</strong> field.
+* For OSX this might be: <strong>/Users/<em>username</em>/Desktop/Test/</strong>
+* For Windows this might be something like <strong>C:\Test</strong></p>
+
+<p>Click <strong>OK</strong>.</p>
+
+<p>Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. Fuison 360 will be busy for the duration of the script running, so it would be adviable to run this on a dedicated machine that you can leav to run for some time. </p>
+
+</body>
+</html>
