@@ -61,14 +61,16 @@ Download the REPO.
 
 Launch Fusion 360.
 Under the **Scripts and Addins** select Arcive-export.
-After a time ( could be a long time ) a dialog will open with a list of projects. The more projects you have the longer this will take.
+In the data panel navigate to the project you want to archive.
+The add-in will export all Fusion 360 files in the active project.
 
 ![](resources/dialog.png)
 
-The dialog promts you to choose a project. From the **Select Project** drop down choose a project.
+The dialog shows you the **Project to Archive** which is the current active project.
 It then allows you to enter a path. Type in a path into the **Output Path** field.
 * For OSX this might be: **/Users/*username*/Desktop/Test/**
 * For Windows this might be something like **C:\Test**
+* Finally under **Export Types** select the differnet files types you want to export.  You can select multiple types.
 
 Click **OK**.
 
