@@ -1,5 +1,5 @@
-#Author- Patrick Rainsberry
-#Description-This is sample addin showing how to export a project.
+# Author- Patrick Rainsberry
+# Description-This is sample addin showing how to export a project.
 # Use at your own risk... this is neither official or supported.
 
 import adsk.core, adsk.fusion, traceback
@@ -29,6 +29,7 @@ def commandDefinitionById(id):
     commandDefinition_ = commandDefinitions_.itemById(id)
     return commandDefinition_
 
+
 def commandControlByIdForPanel(id):
     app = adsk.core.Application.get()
     ui = app.userInterface
@@ -43,12 +44,14 @@ def commandControlByIdForPanel(id):
     toolbarControl_ = toolbarControls_.itemById(id)
     return toolbarControl_
 
+
 def destroyObject(uiObj, tobeDeleteObj):
     if uiObj and tobeDeleteObj:
         if tobeDeleteObj.isValid:
             tobeDeleteObj.deleteMe()
         else:
             uiObj.messageBox('tobeDeleteObj is not a valid object')
+
 
 def exportFolder(rootFolder, outputFolder, file_types):
     for folder in rootFolder.dataFolders:
@@ -57,6 +60,7 @@ def exportFolder(rootFolder, outputFolder, file_types):
         if file.fileExtension == "f3d":
             openDoc(file, outputFolder, file_types)
 
+
 def dupCheck(name):
     if os.path.exists(name):
         base, ext = os.path.splitext(name)
@@ -64,6 +68,7 @@ def dupCheck(name):
         name = base + ext
         dupCheck(name)
     return name
+
 
 # Creates directory and returns file name for settings file
 def getFileName(projectName):
