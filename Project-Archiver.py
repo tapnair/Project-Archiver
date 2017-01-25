@@ -55,10 +55,12 @@ def destroyObject(uiObj, tobeDeleteObj):
 
 def exportFolder(rootFolder, outputFolder, file_types):
     for folder in rootFolder.dataFolders:
-        exportFolder(folder, outputFolder)
+        exportFolder(folder, outputFolder, file_types)
     for file in rootFolder.dataFiles:
-        if file.fileExtension == "f3d":
-            openDoc(file, outputFolder, file_types)
+        if file.objectType == adsk.core.DataFile:
+
+            if file.fileExtension == "f3d":
+                openDoc(file, outputFolder, file_types)
 
 
 def dupCheck(name):
