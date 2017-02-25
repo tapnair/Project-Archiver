@@ -145,8 +145,11 @@ def run(context):
                 # Code to react to the event.
                 try:
                     command = args.firingEvent.sender
-#                    ui.messageBox('Command: {} destroyed'.format(command.parentCommandDefinition.id))
-#                    ui.messageBox("Reason for termination= " + str(args.terminationReason))
+
+                    for document in app.documents:
+                        document.close(True)
+
+
                 except:
                     if ui:
                         ui.messageBox('Input changed event failed: {}'.format(traceback.format_exc()))
