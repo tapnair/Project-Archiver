@@ -79,7 +79,7 @@ Click **OK**.
 Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. Fuison 360 will be busy for the duration of the script running, so it would be adviable to run this on a dedicated machine that you can leav to run for some time. 
 
 
-
+[![Analytics](https://ga-beacon.appspot.com/UA-41076924-3/project-archiver)](https://github.com/igrigorik/ga-beacon)
 
 
 
