@@ -39,7 +39,9 @@ def commandControlByIdForPanel(id):
     workspaces_ = ui.workspaces
     modelingWorkspace_ = workspaces_.itemById('FusionSolidEnvironment')
     toolbarPanels_ = modelingWorkspace_.toolbarPanels
-    toolbarPanel_ = toolbarPanels_.item(8)
+    toolbarPanel_ = toolbarPanels_.itemById('SolidScriptsAddinsPanel') # add the new command under the Addins panel
+    if toolbarPanel_ is None:
+        toolbarPanel_ = toolbarPanels_.item(8)
     toolbarControls_ = toolbarPanel_.controls
     toolbarControl_ = toolbarControls_.itemById(id)
     return toolbarControl_
