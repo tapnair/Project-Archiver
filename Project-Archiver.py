@@ -57,7 +57,12 @@ def destroyObject(uiObj, tobeDeleteObj):
 
 def exportFolder(rootFolder, outputFolder, file_types):
     for folder in rootFolder.dataFolders:
-        exportFolder(folder, outputFolder, file_types)
+        if os.name == 'nt':
+            childFolder = outputFolder + folder.name + "\\"
+        else:
+            childFolder = outputFolder + folder.name + "/"
+        os.mkdir(childFolder)
+        exportFolder(folder, childFolder, file_types)
     for file in rootFolder.dataFiles:
         if file.fileExtension == "f3d":
             openDoc(file, outputFolder, file_types)
