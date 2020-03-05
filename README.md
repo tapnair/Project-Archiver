@@ -51,7 +51,7 @@ Download the REPO.
 	![](resources/archiver-addin.png)
 
 6. Dismiss the Addins dialog.  
-7.  On the main toolbar click the **Scripts and Addins** menu and you should see **Archive-Exporter** Pane.
+7.  Click the ProjectArchiver Tab and you should see **Archive** Pane.
 
 	![](resources/button.png)
 
@@ -72,13 +72,24 @@ It then allows you to enter a path. Type in a path into the **Output Path** fiel
 * For OSX this might be: **/Users/*username*/Desktop/Test/**
 * For Windows this might be something like **C:\Test**
 
-Finally under **Export Types** select the differnet files types you want to export.  You can select multiple types.
+Finally under **Export Types** select the different files types you want to export.  You can select multiple types.
 
 Click **OK**.
 
-Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. Fuison 360 will be busy for the duration of the script running, so it would be adviable to run this on a dedicated machine that you can leav to run for some time. 
+Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. 
+Fusion 360 will be busy for the duration of the script running, so it would be advisable to run this on a dedicated machine that you can leav to run for some time. 
+
+## License
+Samples are licensed under the terms of the [MIT License](http://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for full details.
+
+## Written by
+
+Written by [Patrick Rainsberry](https://twitter.com/prrainsberry) <br /> (Autodesk Fusion 360 Product Manager)
+
+See more useful [Fusion 360 Utilities](https://tapnair.github.io/index.html)
 
 
+Analytics
 [![Analytics](https://ga-beacon.appspot.com/UA-41076924-3/project-archiver)](https://github.com/igrigorik/ga-beacon)
 
 
