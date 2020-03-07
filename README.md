@@ -2,7 +2,8 @@
 The archiver script will open all Fusion 360 3D data in a project and export it as STEP to a local location of your choosing. 
 
 [How to install](#How-to-install)  
-[How to use](#How-to-use)
+[How to use](#How-to-use)   
+[For Developers](#For-Developers)
 
 ----
 
@@ -56,6 +57,13 @@ Click **OK**.
 Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. 
 Fusion 360 will be busy for the duration of the script running, so it would be advisable to run this on a dedicated machine that you can leav to run for some time. 
 
+### For Developers<a name="For-Developers"></a>
+Clone the repo
+
+Update the apper submodule by browsing to the 'Project-Archiver' sub directory in the unzipped directory and executing:
+
+    git submodule add https://github.com/tapnair/apper
+   
 ## License
 Samples are licensed under the terms of the [MIT License](http://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for full details.
 
