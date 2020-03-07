@@ -20,7 +20,7 @@ try:
     import config
     import apper
 
-    from .commands.ExportCommand import ExportCommand
+    from commands.ExportCommand import ExportCommand
 
     my_addin = apper.FusionApp(config.app_name, config.company_name, False)
 
