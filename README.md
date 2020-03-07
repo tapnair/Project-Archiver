@@ -7,7 +7,10 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ###How to install<a name="How-to-install"></a>
-Download the [latest distribution]()
+1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/tree/master/dist)
+![](Project-Archiver/resources/download.png)
+
+2. Unzip the archive to a permanent location on your computer
 
 ###Fusion 360  
 
@@ -26,7 +29,7 @@ Download the [latest distribution]()
      
 5. Click run.  
 6. Dismiss the Addins dialog.  
-7.  Click the ProjectArchiver Tab and you should see **Archive** Pane.
+7.  Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
 
 	![](Project-Archiver/resources/button.png)
 
@@ -34,20 +37,19 @@ Download the [latest distribution]()
 
 ###How to use<a name="How-to-use"></a>
 
-Launch Fusion 360.
-Under the **Scripts and Addins** select Arcive-export.
 In the data panel navigate to the project you want to archive.
 The add-in will export all Fusion 360 files in the active project.
 
 ![](Project-Archiver/resources/dialog.png)
 
-The dialog shows you the **Project to Archive** which is the current active project.
-
 It then allows you to enter a path. Type in a path into the **Output Path** field.
 * For OSX this might be: **/Users/*username*/Desktop/Test/**
 * For Windows this might be something like **C:\Test**
 
-Finally under **Export Types** select the different files types you want to export.  You can select multiple types.
+Under **Export Types** select the different files types you want to export.  You can select multiple types.
+
+File Name Options allow you to specify the naming convention for output files.  
+If you select 'Document Name' you can choose whether or not to append the version number to the file name.
 
 Click **OK**.
 
