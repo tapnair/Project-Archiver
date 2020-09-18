@@ -2,8 +2,8 @@
 #  Copyright (c) 2020 by Patrick Rainsberry.                                   ~
 #  :license: Apache2, see LICENSE for more details.                            ~
 #  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#  ApperSample.py                                                              ~
-#  This file is a component of ApperSample.                                    ~
+#  Project-Archiver.py                                                            ~
+#  This file is a component of Project-Archiver.                                  ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import os

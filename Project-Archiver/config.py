@@ -3,7 +3,7 @@
 #  :license: Apache2, see LICENSE for more details.                            ~
 #  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #  config.py                                                                   ~
-#  This file is a component of ApperSample.                                    ~
+#  This file is a component of Project-Archiver.                               ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 app_name = 'ProjectArchiver'

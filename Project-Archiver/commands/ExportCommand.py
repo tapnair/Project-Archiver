@@ -3,7 +3,7 @@
 #  :license: Apache2, see LICENSE for more details.                            ~
 #  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #  SampleCommand2.py                                                           ~
-#  This file is a component of ApperSample.                                    ~
+#  This file is a component of Project-Archiver.                               ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os
 
