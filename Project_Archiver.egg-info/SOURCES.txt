@@ -12,6 +12,7 @@ Project-Archiver/apper/apper/FusionApp.py
 Project-Archiver/apper/apper/PaletteCommandBase.py
 Project-Archiver/apper/apper/__init__.py
 Project-Archiver/apper/apper/__version__.py
+Project-Archiver/commands/AssemblyDelete.py
 Project-Archiver/commands/ExportCommand.py
 Project-Archiver/commands/__INIT__.py
 Project-Archiver/commands/resources/command_icons/16x16-dark.png
@@ -28,7 +29,10 @@ Project-Archiver/resources/button.png
 Project-Archiver/resources/dialog.png
 Project-Archiver/resources/download.png
 Project-Archiver/resources/osx-result.png
+Project-Archiver/resources/pump_case_drawing.png
 Project-Archiver/resources/scripts-addins.png
+Project-Archiver/resources/scripts-addins_button.png
+Project-Archiver/resources/unzipped.png
 Project-Archiver/resources/windows-result.png
 Project_Archiver.egg-info/PKG-INFO
 Project_Archiver.egg-info/SOURCES.txt
