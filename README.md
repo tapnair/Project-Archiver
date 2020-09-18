@@ -8,8 +8,9 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/tree/master/dist)
-![](Project-Archiver/resources/download.png)
+1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project-Archiver.zip)
+
+*Note you should download from the link above.  The regular git downloads won't get the apper submodule*
 
 2. Unzip the archive to a permanent location on your computer
 
@@ -23,14 +24,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 3. Select the **Addins tab** and click the "add"  
 
     ![](Project-Archiver/resources/scripts-addins.png)
-    
-4. Browse to the 'Project-Archiver' sub directory in the unzipped directory
-    
-     ![](Project-Archiver/resources/unzipped.png)
-     
-5. Click run.  
+
+4. Browse to the unzipped folder
+5. Select the addin in the list and click run.  
 6. Dismiss the Addins dialog.  
-7.  Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
+7. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
 
 	![](Project-Archiver/resources/button.png)
 
