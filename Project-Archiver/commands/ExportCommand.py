@@ -161,6 +161,11 @@ class ExportCommand(apper.Fusion360CommandBase):
         write_version = input_values['write_version']
         name_option = input_values['name_option_id']
         root_folder = ao.app.data.activeProject.rootFolder
+
+        # Create the base folder for this output if doesn't exist
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+
         export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
 
         if len(SKIPPED_FILES) > 0:
