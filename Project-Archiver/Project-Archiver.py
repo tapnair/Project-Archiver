@@ -11,10 +11,8 @@ import sys
 import adsk.core
 import traceback
 
-app_path = os.path.dirname(__file__)
-
-sys.path.insert(0, app_path)
-sys.path.insert(0, os.path.join(app_path, 'apper'))
+from.startup import setup_app, cleanup_app, get_app_path
+setup_app(__file__)
 
 try:
     import config
@@ -23,6 +21,7 @@ try:
     from commands.ExportCommand import ExportCommand
 
     my_addin = apper.FusionApp(config.app_name, config.company_name, False)
+    my_addin.root_path = get_app_path(__file__)
 
     my_addin.add_command(
         'Export Active Project',
@@ -53,5 +52,4 @@ def run(context):
 
 def stop(context):
     my_addin.stop_app()
-    sys.path.pop(0)
-    sys.path.pop(0)
+    cleanup_app(__file__)
