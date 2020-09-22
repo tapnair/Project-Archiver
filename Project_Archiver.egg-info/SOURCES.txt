@@ -3,6 +3,7 @@ setup.py
 Project-Archiver/Project-Archiver.manifest
 Project-Archiver/Project-Archiver.py
 Project-Archiver/config.py
+Project-Archiver/startup.py
 Project-Archiver/apper/apper/AboutCommand.py
 Project-Archiver/apper/apper/Fusion360AppEvents.py
 Project-Archiver/apper/apper/Fusion360CommandBase.py
