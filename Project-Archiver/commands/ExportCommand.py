@@ -163,7 +163,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         root_folder = ao.app.data.activeProject.rootFolder
 
         # Make sure we have a folder not a file
-        if (output_folder.endswith(os.path.sep) == False):
+        if not output_folder.endswith(os.path.sep):
             output_folder += os.path.sep
 
         # Create the base folder for this output if doesn't exist
