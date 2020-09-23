@@ -14,6 +14,7 @@ Project-Archiver/apper/apper/PaletteCommandBase.py
 Project-Archiver/apper/apper/__init__.py
 Project-Archiver/apper/apper/__version__.py
 Project-Archiver/commands/AssemblyDelete.py
+Project-Archiver/commands/CloseAllCommand.py
 Project-Archiver/commands/ExportCommand.py
 Project-Archiver/commands/resources/command_icons/16x16-dark.png
 Project-Archiver/commands/resources/command_icons/16x16-disabled.png

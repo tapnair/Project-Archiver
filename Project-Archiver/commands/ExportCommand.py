@@ -179,6 +179,9 @@ class ExportCommand(apper.Fusion360CommandBase):
                 )
             )
 
+        close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
+        close_command.execute()
+
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
         global SKIPPED_FILES
         SKIPPED_FILES.clear()

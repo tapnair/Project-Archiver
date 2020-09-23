@@ -8,3 +8,5 @@
 
 app_name = 'ProjectArchiver'
 company_name = "Autodesk"
+close_cmd_id = 'close_cmd'
+
