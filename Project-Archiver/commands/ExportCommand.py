@@ -15,8 +15,9 @@ import apper
 from apper import AppObjects
 
 import config
+import traceback
 
-SKIPPED_FILES = []
+FILES_WITH_EXTERNAL_REFS = []
 
 
 def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
@@ -36,10 +37,11 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
-            open_doc(file)
+            doc = open_doc(file)
             try:
                 output_name = get_name(write_version, name_option)
                 export_active_doc(output_folder, file_types, output_name)
+                close_doc( doc )
 
             # TODO add handling
             except ValueError as e:
@@ -57,13 +59,21 @@ def open_doc(data_file):
         document = app.documents.open(data_file, True)
         if document is not None:
             document.activate()
+            return document
     except:
         pass
         # TODO add handling
 
+def close_doc( doc ):
+    ui = None 
+    try:
+        doc.close(False)
+    except:
+        if ui:
+            ui.messageBox('Close Failed:\n{}'.format(traceback.format_exc()))
 
 def export_active_doc(folder, file_types, output_name):
-    global SKIPPED_FILES
+    global FILES_WITH_EXTERNAL_REFS
 
     ao = AppObjects()
     export_mgr = ao.export_manager
@@ -87,14 +97,13 @@ def export_active_doc(folder, file_types, output_name):
     if file_types.item(file_types.count - 2).isSelected:
 
         if ao.document.allDocumentReferences.count > 0:
-            SKIPPED_FILES.append(ao.document.name)
+            FILES_WITH_EXTERNAL_REFS.append(ao.document.name) # Why?
 
-        else:
-            export_name = folder + output_name + '.f3d'
-            export_name = dup_check(export_name)
-            export_options = export_mgr.createFusionArchiveExportOptions(export_name)
-            export_mgr.execute(export_options)
-
+        export_name = folder + output_name + '.f3d'
+        export_name = dup_check(export_name)
+        export_options = export_mgr.createFusionArchiveExportOptions(export_name)
+        export_mgr.execute(export_options)
+    
     if file_types.item(file_types.count - 1).isSelected:
         stl_export_name = folder + output_name + '.stl'
         stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
@@ -149,7 +158,7 @@ class ExportCommand(apper.Fusion360CommandBase):
             update_name_inputs(inputs, changed_input.selectedItem.name)
 
     def on_execute(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, args, input_values):
-        global SKIPPED_FILES
+        global FILES_WITH_EXTERNAL_REFS
         ao = AppObjects()
 
         output_folder = input_values['output_folder']
@@ -172,19 +181,19 @@ class ExportCommand(apper.Fusion360CommandBase):
 
         export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
 
-        if len(SKIPPED_FILES) > 0:
+        if len(FILES_WITH_EXTERNAL_REFS) > 0:
             ao.ui.messageBox(
-                "The following files contained external references and could not be exported as f3d's: {}".format(
-                    SKIPPED_FILES
+                "The following files contained external references, be careful with these files and their references: {}".format(
+                    FILES_WITH_EXTERNAL_REFS
                 )
             )
 
-        close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
-        close_command.execute()
+        #close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
+        #close_command.execute()
 
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
-        global SKIPPED_FILES
-        SKIPPED_FILES.clear()
+        global FILES_WITH_EXTERNAL_REFS
+        FILES_WITH_EXTERNAL_REFS.clear()
         default_dir = apper.get_default_dir(config.app_name)
 
         inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
