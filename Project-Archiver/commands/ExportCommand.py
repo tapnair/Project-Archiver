@@ -18,6 +18,7 @@ import config
 import traceback
 
 FILES_WITH_EXTERNAL_REFS = []
+FAILED_FILES = []
 
 
 def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
@@ -45,11 +46,11 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
             # TODO add handling
             except ValueError as e:
-                ao.ui.messageBox(str(e))
+                ao.ui.messageBox('export_folder Failed:ValueError\n{}'.format(traceback.format_exc()))
 
             except AttributeError as e:
-                ao.ui.messageBox(str(e))
-                break
+                FAILED_FILES.append(ao.document.name)
+                ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
 
 
 def open_doc(data_file):
@@ -61,16 +62,15 @@ def open_doc(data_file):
             document.activate()
             return document
     except:
-        pass
-        # TODO add handling
+        ao = AppObjects()
+        ao.ui.messageBox('open_doc Failed:\n{}'.format(traceback.format_exc()))
 
 def close_doc( doc ):
-    ui = None 
     try:
         doc.close(False)
     except:
-        if ui:
-            ui.messageBox('Close Failed:\n{}'.format(traceback.format_exc()))
+        ao = AppObjects()
+        ao.ui.messageBox('close_doc Failed:\n{}'.format(traceback.format_exc()))
 
 def export_active_doc(folder, file_types, output_name):
     global FILES_WITH_EXTERNAL_REFS
@@ -126,6 +126,10 @@ def get_name(write_version, option):
     if option == 'Document Name':
 
         doc_name = ao.app.activeDocument.name
+        
+        if (doc_name.find('/') != -1):
+          ao.ui.messageBox('Error: Filename has an illegal "/". You must rename this model:\n{}'.format(doc_name) )
+          # TODO: Exit AddIn gracefully. 
 
         if not write_version:
             doc_name = doc_name[:doc_name.rfind(' v')]
@@ -187,9 +191,16 @@ class ExportCommand(apper.Fusion360CommandBase):
                     FILES_WITH_EXTERNAL_REFS
                 )
             )
+            
+        if len(FAILED_FILES) > 0:
+            ao.ui.messageBox(
+                "The following files Failed Export: {}".format(
+                    FAILED_FILES
+                )
+            )
+            
+        ao.ui.messageBox( "Finished Exporting." )
 
-        #close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
-        #close_command.execute()
 
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
         global FILES_WITH_EXTERNAL_REFS
