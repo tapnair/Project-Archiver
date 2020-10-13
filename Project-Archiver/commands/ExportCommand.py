@@ -45,7 +45,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
     progressDialog.isCancelButtonShown = True
 
     # Show progress dialog
-    progressDialog.show(root_folder.name, 'Processing %v of %m', 0, len(root_folder.dataFiles)+1, 0)
+    progressDialog.show(root_folder.name, 'Processing %v of %m', 0, len(root_folder.dataFiles), 0)
     
     for data_file in root_folder.dataFiles:
         # Update progress value of progress dialog
@@ -54,6 +54,9 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
             stop_here_error
             break
         adsk.doEvents()
+        
+        # TODO: Priority=low: Improve progress metering for larger projects when exporting all versions
+        # Refactor this outer loop so that a list of all files and versions is generated first, and then iterated on. 
             
         if data_file.fileExtension == "f3d":
             if export_all_versions:
@@ -62,7 +65,10 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
                 versions = [ data_file ]
                 
             for data_file_v in versions:
-                # This dup check and open_doc should be bubbled into 'export_data_file()'
+                # TODO: Priority=highest: Fix Main inner loop
+                # This is the main inner loop and is very dirty. 
+                # A duplicate check was placed here to speed up sync of large projects, but this breaks exports of non-f3d files
+                # This dup_check, open_doc, export_doc, close_doc should be bubbled into 'export_data_file()'
                 output_name = get_name2(data_file_v, write_version, name_option)
                 export_name = output_folder + output_name + '.f3d' # This is dirty because it would skip exports for other file types
                 export_name, dup = dup_check(export_name)
@@ -252,6 +258,8 @@ class ExportCommand(apper.Fusion360CommandBase):
 
         export_folder(project_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
+        # TODO: Priority=mid: FILES_WITH_EXTERNAL_REFS, FAILED_FILES and SKIPPED_DUP_FILES should be stored in a log file, not on a dialog
+        # TODO: Priority=mid: There should be one single dialog with final stats and pointer to log files. 
         if len(FILES_WITH_EXTERNAL_REFS) > 0:
             ao.ui.messageBox(
                 "The following files contained external references, be careful with these files and their references: {}".format(
