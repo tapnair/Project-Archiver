@@ -74,7 +74,7 @@ def open_doc(data_file):
             return document
     except:
         ao = AppObjects()
-        ao.ui.messageBox('open_doc Failed:\n{}'.format(traceback.format_exc()))
+        ao.ui.messageBox('open_doc failed for file:{name}\n{tb}'.format(name=data_file.name,tb=traceback.format_exc()))
 
 def close_doc( doc ):
     try:
