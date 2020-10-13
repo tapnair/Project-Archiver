@@ -4,7 +4,7 @@
 	"id":	"31c84e41-5975-4127-90e6-f1bfa65eafe3",
 	"author":	"Patrick Rainsberry",
 	"description":	{
-		"":	"Export all files in a given project to Step FIle for archival purposes."
+		"":	"Export all files in a given project to Step File for archival purposes."
 	},
 	"version":	"0.0",
 	"runOnStartup":	false,
