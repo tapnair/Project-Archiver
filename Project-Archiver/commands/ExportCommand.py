@@ -44,19 +44,24 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
                 versions = [ data_file ]
                 
             for data_file_v in versions:
-                doc = open_doc(data_file_v)
-                try:
-                    output_name = get_name(write_version, name_option)
-                    export_active_doc(output_folder, file_types, output_name, skip_duplicates)
-                    close_doc( doc )
+                # This dup check and open_doc should be bubbled into 'export_data_file()'
+                output_name = get_name2(data_file_v, write_version, name_option)
+                export_name = output_folder + output_name + '.f3d' # This is dirty because it would skip exports for other file types
+                export_name, dup = dup_check(export_name)
+                if not (dup and skip_duplicates):
+                    doc = open_doc(data_file_v)
+                    try:
+                        #output_name = get_name(write_version, name_option)
+                        export_active_doc(output_folder, file_types, output_name, skip_duplicates)
+                        close_doc( doc )
 
-                # TODO add handling
-                except ValueError as e:
-                    ao.ui.messageBox('export_folder Failed:ValueError\n{}'.format(traceback.format_exc()))
+                    # TODO add handling
+                    except ValueError as e:
+                        ao.ui.messageBox('export_folder Failed:ValueError\n{}'.format(traceback.format_exc()))
 
-                except AttributeError as e:
-                    FAILED_FILES.append(ao.document.name)
-                    ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
+                    except AttributeError as e:
+                        FAILED_FILES.append(ao.document.name)
+                        ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
 
 
 def open_doc(data_file):
@@ -158,6 +163,34 @@ def get_name(write_version, option):
         raise ValueError('Something strange happened')
 
     return output_name
+    
+def get_name2(data_file, write_version, option):
+    ao = AppObjects()
+    output_name = ''
+
+    if option == 'Document Name':
+
+        doc_name = data_file.name + " v" + str(data_file.versionNumber)
+        #ao.ui.messageBox('get_name2:data_file\n{}'.format(doc_name) )
+                
+        if (doc_name.find('/') != -1):
+          ao.ui.messageBox('Error: Filename has an illegal "/". You must rename this model:\n{}'.format(doc_name) )
+          # TODO: Exit AddIn gracefully. 
+
+        if not write_version:
+            doc_name = doc_name[:doc_name.rfind(' v')]
+        output_name = doc_name
+
+    elif option == 'Description':
+        output_name = ao.root_comp.description
+
+    elif option == 'Part Number':
+        output_name = ao.root_comp.partNumber
+
+    else:
+        raise ValueError('Something strange happened')
+
+    return output_name
 
 
 def update_name_inputs(command_inputs, selection):
@@ -227,6 +260,8 @@ class ExportCommand(apper.Fusion360CommandBase):
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
         global FILES_WITH_EXTERNAL_REFS
         FILES_WITH_EXTERNAL_REFS.clear()
+        FAILED_FILES.clear()
+        SKIPPED_DUP_FILES.clear()
         default_dir = apper.get_default_dir(config.app_name)
 
         inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
