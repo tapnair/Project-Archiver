@@ -20,8 +20,7 @@ import traceback
 FILES_WITH_EXTERNAL_REFS = []
 FAILED_FILES = []
 
-
-def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
+def export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, name_option, folder_preserve):
     ao = AppObjects()
 
     for folder in root_folder.dataFolders:
@@ -34,23 +33,29 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
         else:
             new_folder = output_folder
 
-        export_folder(folder, new_folder, file_types, write_version, name_option, folder_preserve)
+        export_folder(folder, new_folder, file_types, write_version, export_all_versions, name_option, folder_preserve)
 
-    for file in root_folder.dataFiles:
-        if file.fileExtension == "f3d":
-            doc = open_doc(file)
-            try:
-                output_name = get_name(write_version, name_option)
-                export_active_doc(output_folder, file_types, output_name)
-                close_doc( doc )
+    for data_file in root_folder.dataFiles:
+        if data_file.fileExtension == "f3d":
+            if export_all_versions:
+                versions = data_file.versions
+            else:
+                versions = [ data_file ]
+                
+            for data_file_v in versions:
+                doc = open_doc(data_file_v)
+                try:
+                    output_name = get_name(write_version, name_option)
+                    export_active_doc(output_folder, file_types, output_name)
+                    close_doc( doc )
 
-            # TODO add handling
-            except ValueError as e:
-                ao.ui.messageBox('export_folder Failed:ValueError\n{}'.format(traceback.format_exc()))
+                # TODO add handling
+                except ValueError as e:
+                    ao.ui.messageBox('export_folder Failed:ValueError\n{}'.format(traceback.format_exc()))
 
-            except AttributeError as e:
-                FAILED_FILES.append(ao.document.name)
-                ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
+                except AttributeError as e:
+                    FAILED_FILES.append(ao.document.name)
+                    ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
 
 
 def open_doc(data_file):
@@ -172,6 +177,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         file_types = inputs.itemById('file_types_input').listItems
 
         write_version = input_values['write_version']
+        export_all_versions = input_values['export_all_versions']
         name_option = input_values['name_option_id']
         root_folder = ao.app.data.activeProject.rootFolder
 
@@ -183,7 +189,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
-        export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
+        export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, name_option, folder_preserve)
 
         if len(FILES_WITH_EXTERNAL_REFS) > 0:
             ao.ui.messageBox(
@@ -213,10 +219,10 @@ class ExportCommand(apper.Fusion360CommandBase):
                                                          adsk.core.DropDownStyles.CheckBoxDropDownStyle)
         drop_input_list = drop_input_list.listItems
         drop_input_list.add('IGES', False)
-        drop_input_list.add('STEP', True)
+        drop_input_list.add('STEP', False)
         drop_input_list.add('SAT', False)
         drop_input_list.add('SMT', False)
-        drop_input_list.add('F3D', False)
+        drop_input_list.add('F3D', True)
         drop_input_list.add('STL', False)
 
         name_option_group = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
@@ -229,7 +235,10 @@ class ExportCommand(apper.Fusion360CommandBase):
         preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
         preserve_input.isVisible = True
 
-        version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
-        version_input.isVisible = False
+        version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', True)
+        version_input.isVisible = True
+        
+        all_versions_input = inputs.addBoolValueInput('export_all_versions', 'Export all versions?', True, '', True)
+        all_versions_input.isVisible = True
 
         update_name_inputs(inputs, 'Document Name')
