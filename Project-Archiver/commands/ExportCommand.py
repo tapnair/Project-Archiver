@@ -19,8 +19,9 @@ import traceback
 
 FILES_WITH_EXTERNAL_REFS = []
 FAILED_FILES = []
+SKIPPED_DUP_FILES = []
 
-def export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, name_option, folder_preserve):
+def export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve):
     ao = AppObjects()
 
     for folder in root_folder.dataFolders:
@@ -33,7 +34,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
         else:
             new_folder = output_folder
 
-        export_folder(folder, new_folder, file_types, write_version, export_all_versions, name_option, folder_preserve)
+        export_folder(folder, new_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
     for data_file in root_folder.dataFiles:
         if data_file.fileExtension == "f3d":
@@ -46,7 +47,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
                 doc = open_doc(data_file_v)
                 try:
                     output_name = get_name(write_version, name_option)
-                    export_active_doc(output_folder, file_types, output_name)
+                    export_active_doc(output_folder, file_types, output_name, skip_duplicates)
                     close_doc( doc )
 
                 # TODO add handling
@@ -77,9 +78,9 @@ def close_doc( doc ):
         ao = AppObjects()
         ao.ui.messageBox('close_doc Failed:\n{}'.format(traceback.format_exc()))
 
-def export_active_doc(folder, file_types, output_name):
+def export_active_doc(folder, file_types, output_name, skip_dups):
     global FILES_WITH_EXTERNAL_REFS
-
+    
     ao = AppObjects()
     export_mgr = ao.export_manager
 
@@ -95,9 +96,10 @@ def export_active_doc(folder, file_types, output_name):
 
         if file_types.item(i).isSelected:
             export_name = folder + output_name + export_extensions[i]
-            export_name = dup_check(export_name)
-            export_options = export_functions[i](export_name)
-            export_mgr.execute(export_options)
+            export_name, dup = dup_check(export_name)
+            if not (dup and skip_dups):
+                export_options = export_functions[i](export_name)
+                export_mgr.execute(export_options)
 
     if file_types.item(file_types.count - 2).isSelected:
 
@@ -105,23 +107,29 @@ def export_active_doc(folder, file_types, output_name):
             FILES_WITH_EXTERNAL_REFS.append(ao.document.name) # Why?
 
         export_name = folder + output_name + '.f3d'
-        export_name = dup_check(export_name)
-        export_options = export_mgr.createFusionArchiveExportOptions(export_name)
-        export_mgr.execute(export_options)
+        export_name, dup = dup_check(export_name)
+        if not (dup and skip_dups):
+            export_options = export_mgr.createFusionArchiveExportOptions(export_name)
+            export_mgr.execute(export_options)
     
     if file_types.item(file_types.count - 1).isSelected:
         stl_export_name = folder + output_name + '.stl'
-        stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
-        export_mgr.execute(stl_options)
+        stl_export_name, dup = dup_check(stl_export_name)
+        if not (dup and skip_dups):
+            stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
+            export_mgr.execute(stl_options)
 
 
 def dup_check(name):
+    dup = False
     if os.path.exists(name):
+        SKIPPED_DUP_FILES.append(name)
         base, ext = os.path.splitext(name)
         base += '-dup'
         name = base + ext
         dup_check(name)
-    return name
+        dup = True
+    return name, dup
 
 
 def get_name(write_version, option):
@@ -180,6 +188,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         export_all_versions = input_values['export_all_versions']
         name_option = input_values['name_option_id']
         root_folder = ao.app.data.activeProject.rootFolder
+        skip_duplicates = input_values['skip_duplicates']
 
         # Make sure we have a folder not a file
         if not output_folder.endswith(os.path.sep):
@@ -189,7 +198,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
-        export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, name_option, folder_preserve)
+        export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
         if len(FILES_WITH_EXTERNAL_REFS) > 0:
             ao.ui.messageBox(
@@ -204,6 +213,13 @@ class ExportCommand(apper.Fusion360CommandBase):
                     FAILED_FILES
                 )
             )
+            
+        if len(SKIPPED_DUP_FILES) > 0:
+            ao.ui.messageBox(
+                "The following files were skipped because they were duplicates: {}".format(
+                    SKIPPED_DUP_FILES
+                )
+            )            
             
         ao.ui.messageBox( "Finished Exporting." )
 
@@ -240,5 +256,8 @@ class ExportCommand(apper.Fusion360CommandBase):
         
         all_versions_input = inputs.addBoolValueInput('export_all_versions', 'Export all versions?', True, '', True)
         all_versions_input.isVisible = True
+        
+        skip_duplicates_input = inputs.addBoolValueInput('skip_duplicates', 'Skip duplicates?', True, '', True)
+        skip_duplicates_input.isVisible = True
 
         update_name_inputs(inputs, 'Document Name')
