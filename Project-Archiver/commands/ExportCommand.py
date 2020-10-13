@@ -92,6 +92,8 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
 
 
 def open_doc(data_file):
+    # TODO: This often fails due to Runtime Error 3. Error Downloading. 
+    # However, when ran again, it works. This function should be updated to retry at least once.
     app = adsk.core.Application.get()
 
     try:
@@ -258,30 +260,27 @@ class ExportCommand(apper.Fusion360CommandBase):
 
         export_folder(project_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
-        # TODO: Priority=mid: FILES_WITH_EXTERNAL_REFS, FAILED_FILES and SKIPPED_DUP_FILES should be stored in a log file, not on a dialog
-        # TODO: Priority=mid: There should be one single dialog with final stats and pointer to log files. 
-        if len(FILES_WITH_EXTERNAL_REFS) > 0:
-            ao.ui.messageBox(
-                "The following files contained external references, be careful with these files and their references: {}".format(
-                    FILES_WITH_EXTERNAL_REFS
-                )
-            )
-            
+        # Report Final Results
+        log_file_name = output_folder + 'export_log.txt'
+        f = open( log_file_name, "a")
+        f.write("- - - - - - Exporting Log Session - - - - - - \n")
         if len(FAILED_FILES) > 0:
-            ao.ui.messageBox(
-                "The following files Failed Export: {}".format(
-                    FAILED_FILES
-                )
-            )
-            
+            f.write("The following files Failed Export:\n")
+            for f_n in FAILED_FILES:
+                f.write("  {}\n".format(f_n))
+        if len(FILES_WITH_EXTERNAL_REFS) > 0:
+            f.write("The following files contained external references, be careful with these files and their references:\n")
+            for f_n in FILES_WITH_EXTERNAL_REFS:
+                f.write("  {}\n".format(f_n))
         if len(SKIPPED_DUP_FILES) > 0:
-            ao.ui.messageBox(
-                "The following files were skipped because they were duplicates: {}".format(
-                    SKIPPED_DUP_FILES
-                )
-            )            
-            
-        ao.ui.messageBox( "Finished Exporting." )
+            f.write("The following files were skipped because they were duplicates:\n")
+            for f_n in SKIPPED_DUP_FILES:
+                f.write("  {}\n".format(f_n))        
+        f.close()
+        
+        ao.ui.messageBox( "Finished Exporting:\n  Failed files:{fails}\n  SkippeddDuplicate Files:{dups}\n  Files with External References:{refs}\n".format(
+          fails=len(FAILED_FILES),dups=len(SKIPPED_DUP_FILES),refs=len(FILES_WITH_EXTERNAL_REFS)
+        ) )
 
 
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
