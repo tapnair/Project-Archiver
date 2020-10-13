@@ -278,7 +278,7 @@ class ExportCommand(apper.Fusion360CommandBase):
                 f.write("  {}\n".format(f_n))        
         f.close()
         
-        ao.ui.messageBox( "Finished Exporting:\n  Failed files:{fails}\n  SkippeddDuplicate Files:{dups}\n  Files with External References:{refs}\n".format(
+        ao.ui.messageBox( "Finished Exporting:\n  Failed files:{fails}\n  SkippeddDuplicate Files:{dups}\n  Files with External References:{refs}\nSee export_log.txt".format(
           fails=len(FAILED_FILES),dups=len(SKIPPED_DUP_FILES),refs=len(FILES_WITH_EXTERNAL_REFS)
         ) )
 
