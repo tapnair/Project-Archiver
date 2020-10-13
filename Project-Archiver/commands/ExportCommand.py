@@ -36,7 +36,25 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
 
         export_folder(folder, new_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
+    # Set styles of progress dialog.
+    app = adsk.core.Application.get()
+    ui  = app.userInterface
+    progressDialog = ui.createProgressDialog()
+    progressDialog.isBackgroundTranslucent = False
+    progressDialog.cancelButtonText = 'Cancel'
+    progressDialog.isCancelButtonShown = True
+
+    # Show progress dialog
+    progressDialog.show(root_folder.name, 'Processing %v of %m', 0, len(root_folder.dataFiles)+1, 0)
+    
     for data_file in root_folder.dataFiles:
+        # Update progress value of progress dialog
+        progressDialog.progressValue += 1
+        if progressDialog.wasCancelled:
+            stop_here_error
+            break
+        adsk.doEvents()
+            
         if data_file.fileExtension == "f3d":
             if export_all_versions:
                 versions = data_file.versions
@@ -62,6 +80,9 @@ def export_folder(root_folder, output_folder, file_types, write_version, export_
                     except AttributeError as e:
                         FAILED_FILES.append(ao.document.name)
                         ao.ui.messageBox('export_folder Failed:AttributeError\n{}'.format(traceback.format_exc()))
+    # Hide the progress dialog at the end.
+    progressDialog.hide()
+    adsk.doEvents()
 
 
 def open_doc(data_file):
@@ -210,17 +231,15 @@ class ExportCommand(apper.Fusion360CommandBase):
     def on_execute(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, args, input_values):
         global FILES_WITH_EXTERNAL_REFS
         ao = AppObjects()
+        
+        project_folder = ao.app.data.activeProject.rootFolder
 
         output_folder = input_values['output_folder']
         folder_preserve = input_values['folder_preserve_id']
-
-        # TODO broken?????
-        file_types = inputs.itemById('file_types_input').listItems
-
+        file_types = inputs.itemById('file_types_input').listItems # TODO broken?????
         write_version = input_values['write_version']
         export_all_versions = input_values['export_all_versions']
         name_option = input_values['name_option_id']
-        root_folder = ao.app.data.activeProject.rootFolder
         skip_duplicates = input_values['skip_duplicates']
 
         # Make sure we have a folder not a file
@@ -231,7 +250,7 @@ class ExportCommand(apper.Fusion360CommandBase):
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
-        export_folder(root_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
+        export_folder(project_folder, output_folder, file_types, write_version, export_all_versions, skip_duplicates, name_option, folder_preserve)
 
         if len(FILES_WITH_EXTERNAL_REFS) > 0:
             ao.ui.messageBox(
@@ -262,7 +281,9 @@ class ExportCommand(apper.Fusion360CommandBase):
         FILES_WITH_EXTERNAL_REFS.clear()
         FAILED_FILES.clear()
         SKIPPED_DUP_FILES.clear()
-        default_dir = apper.get_default_dir(config.app_name)
+        
+        ao = AppObjects()
+        default_dir = apper.get_default_dir(config.app_name) + ao.app.data.activeProject.rootFolder.name
 
         inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
 
