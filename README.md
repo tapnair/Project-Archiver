@@ -67,13 +67,6 @@ Samples are licensed under the terms of the [MIT License](http://opensource.org/
 
 ## Written by
 
-Written by [Patrick Rainsberry](https://twitter.com/prrainsberry) <br /> (Autodesk Fusion 360 Product Manager)
+Written by [Patrick Rainsberry](https://twitter.com/prrainsberry) (Autodesk Fusion 360 Product Manager); Cleaned up and Extended by Rodrigo Alvarez<br />
 
 See more useful [Fusion 360 Utilities](https://tapnair.github.io/index.html)
-
-
-Analytics
-[![Analytics](https://ga-beacon.appspot.com/UA-41076924-3/project-archiver)](https://github.com/igrigorik/ga-beacon)
-
-
-
