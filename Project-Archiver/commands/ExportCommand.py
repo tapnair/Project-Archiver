@@ -49,6 +49,9 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
                 ao.ui.messageBox(str(e))
                 break
 
+            # close current doc
+            ao.app.activeDocument.close(False)
+
 
 def open_doc(data_file):
     app = adsk.core.Application.get()
