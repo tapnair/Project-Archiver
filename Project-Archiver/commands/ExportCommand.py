@@ -40,6 +40,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
             try:
                 output_name = get_name(write_version, name_option)
                 export_active_doc(output_folder, file_types, output_name)
+                close_doc(file)
 
             # TODO add handling
             except ValueError as e:
@@ -61,7 +62,15 @@ def open_doc(data_file):
         pass
         # TODO add handling
 
-
+def close_doc(data_file):
+    app = adsk.core.Application.get()
+    document = app.activeDocument
+    try:
+        document.close(False)
+        
+    except:
+        pass
+        
 def export_active_doc(folder, file_types, output_name):
     global SKIPPED_FILES
 
