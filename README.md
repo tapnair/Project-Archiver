@@ -1,9 +1,21 @@
 # Project-Archiver
 Forked since changes to the original project not being made and it being unusable otherwise!
 
+Main aim is to export massive projects without supervision 
+
 Implemented:
 - closing files after export
 - File name cleaning
+- increased robustness a bit (had folder name errors)
+
+TODO:
+- some way of logging errors without GUI interrupts (can probably use a normal log file)
+- only export un-exported files in a project, rather than going through all of them again
+
+
+
+
+
 
 
 The archiver script will open all Fusion 360 3D data in a project and export it as STEP to a local location of your choosing. 
@@ -15,7 +27,7 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project-Archiver.zip)
+1. Click the latest link and download the [latest distribution](https://github.com/o-gent/Project-Archiver/blob/master/Project-Archiver.zip)
 
 *Note you should download from the link above.  The regular git downloads won't get the apper submodule*
 

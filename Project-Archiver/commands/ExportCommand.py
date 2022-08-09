@@ -50,6 +50,9 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
             except AttributeError as e:
                 ao.ui.messageBox(str(e))
             
+            except:
+                pass
+            
             try:
                 ao.app.activeDocument.close(False)
             except:
@@ -151,8 +154,8 @@ def slugify(name):
     """
     name = str(name)
     name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii')
-    value = re.sub(r'[^\w\s-]', '', value)
-    return re.sub(r'[-\s]+', '-', value).strip('-_')
+    name = re.sub(r'[^\w\s-]', '', name)
+    return re.sub(r'[-\s]+', '-', name).strip('-_')
 
 
 def update_name_inputs(command_inputs, selection):
