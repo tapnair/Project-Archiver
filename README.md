@@ -1,5 +1,5 @@
 # Project-Archiver
-Forked since changes to the original project not being made and it being unusable otherwise!
+Forked since changes to the original project not being made and it being unusable otherwise! Is way faster and more reliable now  : ) 
 
 Main aim is to export massive projects without supervision 
 
