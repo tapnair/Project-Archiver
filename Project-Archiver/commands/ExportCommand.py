@@ -6,6 +6,8 @@
 #  This file is a component of Project-Archiver.                               ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os
+import unicodedata
+import re
 
 import adsk.core
 import adsk.fusion
@@ -47,8 +49,14 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
             except AttributeError as e:
                 ao.ui.messageBox(str(e))
-                break
-
+            
+            except:
+                pass
+            
+            try:
+                ao.app.activeDocument.close(False)
+            except:
+                pass
 
 def open_doc(data_file):
     app = adsk.core.Application.get()
@@ -130,8 +138,24 @@ def get_name(write_version, option):
 
     else:
         raise ValueError('Something strange happened')
+    
+    output_name = slugify(output_name)
 
     return output_name
+
+
+def slugify(name):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    name = str(name)
+    name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii')
+    name = re.sub(r'[^\w\s-]', '', name)
+    return re.sub(r'[-\s]+', '-', name).strip('-_')
 
 
 def update_name_inputs(command_inputs, selection):
