@@ -6,6 +6,7 @@
 #  This file is a component of Project-Archiver.                               ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os
+import unicodedata
 
 import adsk.core
 import adsk.fusion
