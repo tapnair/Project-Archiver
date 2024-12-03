@@ -31,6 +31,7 @@ Project-Archiver/resources/button.png
 Project-Archiver/resources/dialog.png
 Project-Archiver/resources/download.png
 Project-Archiver/resources/osx-result.png
+Project-Archiver/resources/pick_add_in.png
 Project-Archiver/resources/pump_case_drawing.png
 Project-Archiver/resources/scripts-addins.png
 Project-Archiver/resources/scripts-addins_button.png
