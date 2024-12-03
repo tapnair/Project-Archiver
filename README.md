@@ -8,7 +8,7 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project_Archiver.zip)
+1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project-Archiver-2.0.1.zip)
 
 *Note you should download from the link above.  The regular git downloads won't get the apper submodule*
 
