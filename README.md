@@ -14,6 +14,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 
 2. Unzip the archive to a permanent location on your computer
 
+**For some reason this zip file can get corrupted by github direct download.
+If you are unable to unzip the file, you should just clone the entire repo or download a zip of the entire repo.
+Then you can navigate to the /dist folder to find the actual correct zip file.
+Extract that file to your computer and continue below.**
+
 ### Fusion 360  
 
 1. Launch Fusion 360.
