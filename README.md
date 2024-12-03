@@ -25,7 +25,10 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 
     ![](Project-Archiver/resources/scripts-addins.png)
 
-4. Browse to the unzipped folder
+4. Browse to the **Project-Archiver** sub-folder in the unzipped folder
+
+   ![](Project-Archiver/resources/pick_add_in.png)
+
 5. Select the addin in the list and click run.  
 6. Dismiss the Addins dialog.  
 7. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
