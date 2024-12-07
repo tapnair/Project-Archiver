@@ -40,7 +40,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
             try:
                 output_name = get_name(write_version, name_option)
                 export_active_doc(output_folder, file_types, output_name)
-
+            
             # TODO add handling
             except ValueError as e:
                 ao.ui.messageBox(str(e))
@@ -67,7 +67,7 @@ def export_active_doc(folder, file_types, output_name):
 
     ao = AppObjects()
     export_mgr = ao.export_manager
-
+    
     export_functions = [export_mgr.createIGESExportOptions,
                         export_mgr.createSTEPExportOptions,
                         export_mgr.createSATExportOptions,
@@ -75,6 +75,8 @@ def export_active_doc(folder, file_types, output_name):
                         export_mgr.createFusionArchiveExportOptions,
                         export_mgr.createSTLExportOptions]
     export_extensions = ['.igs', '.step', '.sat', '.smt', '.f3d', '.stl']
+
+
 
     for i in range(file_types.count-2):
 
@@ -96,10 +98,19 @@ def export_active_doc(folder, file_types, output_name):
             export_mgr.execute(export_options)
 
     if file_types.item(file_types.count - 1).isSelected:
-        stl_export_name = folder + output_name + '.stl'
-        stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
-        export_mgr.execute(stl_options)
+        # Check if document contains any solid bodies
+        design = adsk.fusion.Design.cast(ao.product)
+        if design is not None:
+            root_comp = design.rootComponent
+            if root_comp.bRepBodies.count == 0:
+                # Skip this document if it contains no solid bodies
+                SKIPPED_FILES.append(ao.document.name)
+            else:
+                stl_export_name = folder + output_name + '.stl'
+                stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
+                export_mgr.execute(stl_options)
 
+    ao.document.close(False) # Close the document after exporting
 
 def dup_check(name):
     if os.path.exists(name):
