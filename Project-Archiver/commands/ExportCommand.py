@@ -36,10 +36,18 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
+            file_name = file.name.replace("/", "_")
+            tmp_name = output_folder + file_name + ' v' + str(file.latestVersionNumber) + '.step'
+            #export_name = dup_check(export_name)
+            if os.path.exists(tmp_name):
+                continue
+        
             open_doc(file)
             try:
-                output_name = get_name(write_version, name_option)
+                output_name = get_name(write_version, name_option).replace("/", "_")
                 export_active_doc(output_folder, file_types, output_name)
+                
+                ao.app.activeDocument.close(False)
 
             # TODO add handling
             except ValueError as e:
@@ -80,7 +88,9 @@ def export_active_doc(folder, file_types, output_name):
 
         if file_types.item(i).isSelected:
             export_name = folder + output_name + export_extensions[i]
-            export_name = dup_check(export_name)
+            #export_name = dup_check(export_name)
+            if os.path.exists(export_name):
+                return
             export_options = export_functions[i](export_name)
             export_mgr.execute(export_options)
 
@@ -91,7 +101,9 @@ def export_active_doc(folder, file_types, output_name):
 
         else:
             export_name = folder + output_name + '.f3d'
-            export_name = dup_check(export_name)
+            #export_name = dup_check(export_name)
+            if os.path.exists(export_name):
+                return
             export_options = export_mgr.createFusionArchiveExportOptions(export_name)
             export_mgr.execute(export_options)
 
