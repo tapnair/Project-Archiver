@@ -1,12 +1,19 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: Project-Archiver
-Version: 2.0.1
+Version: 2.1.0
 Summary: A Project Archiving Utility for Fusion 360
 Home-page: https://github.com/tapnair/Project-Archiver
 Author: Patrick Rainsberry
 Author-email: patrick.rainsberry@autodesk.com
 License: MIT
 License-File: LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: description
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: summary
 
 # Project-Archiver
 The archiver script will open all Fusion 360 3D data in a project and export it as STEP to a local location of your choosing. 
@@ -24,6 +31,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 
 2. Unzip the archive to a permanent location on your computer
 
+**For some reason this zip file can get corrupted by github direct download.
+If you are unable to unzip the file, you should just clone the entire repo or download a zip of the entire repo.
+Then you can navigate to the /dist folder to find the actual correct zip file.
+Extract that file to your computer and continue below.**
+
 ### Fusion 360  
 
 1. Launch Fusion 360.
@@ -31,7 +43,7 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 
 	![](Project-Archiver/resources/scripts-addins_button.png)
 
-3. Select the **Addins tab** and click the "add"  
+3. Click the "+" at the top and select **Script or add-in from device**
 
     ![](Project-Archiver/resources/scripts-addins.png)
 
@@ -39,9 +51,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 
    ![](Project-Archiver/resources/pick_add_in.png)
 
-5. Select the addin in the list and click run.  
-6. Dismiss the Addins dialog.  
-7. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
+5. Find Project-Archiver in the add-in list and click the run toggle switch.
+
+   ![](Project-Archiver/resources/run_add_in.png)
+
+6. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
 
 	![](Project-Archiver/resources/button.png)
 
@@ -59,6 +73,10 @@ It then allows you to enter a path. Type in a path into the **Output Path** fiel
 * For Windows this might be something like **C:\Test**
 
 Under **Export Types** select the different files types you want to export.  You can select multiple types.
+
+#### Electronics documents
+
+Electronics documents (prj/sch/brd/lbr) can also be archived. Select the **BRD**, **SCH**, or **LBR** export types to output the corresponding EAGLE files.
 
 File Name Options allow you to specify the naming convention for output files.  
 If you select 'Document Name' you can choose whether or not to append the version number to the file name.

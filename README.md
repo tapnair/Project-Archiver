@@ -26,7 +26,7 @@ Extract that file to your computer and continue below.**
 
 	![](Project-Archiver/resources/scripts-addins_button.png)
 
-3. Select the **Addins tab** and click the "add"  
+3. Click the "+" at the top and select **Script or add-in from device**
 
     ![](Project-Archiver/resources/scripts-addins.png)
 
@@ -34,9 +34,11 @@ Extract that file to your computer and continue below.**
 
    ![](Project-Archiver/resources/pick_add_in.png)
 
-5. Select the addin in the list and click run.  
-6. Dismiss the Addins dialog.  
-7. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
+5. Find Project-Archiver in the add-in list and click the run toggle switch.
+
+   ![](Project-Archiver/resources/run_add_in.png)
+
+6. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
 
 	![](Project-Archiver/resources/button.png)
 
@@ -54,6 +56,10 @@ It then allows you to enter a path. Type in a path into the **Output Path** fiel
 * For Windows this might be something like **C:\Test**
 
 Under **Export Types** select the different files types you want to export.  You can select multiple types.
+
+#### Electronics documents
+
+Electronics documents (prj/sch/brd/lbr) can also be archived. Select the **BRD**, **SCH**, or **LBR** export types to output the corresponding EAGLE files.
 
 File Name Options allow you to specify the naming convention for output files.  
 If you select 'Document Name' you can choose whether or not to append the version number to the file name.

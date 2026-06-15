@@ -6,19 +6,23 @@
 #  This file is a component of Project-Archiver.                                  ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import adsk.core
 import apper
-from apper import AppObjects
 
 
 class CloseAllCommand(apper.Fusion360CommandBase):
 
     def on_execute(self, command, inputs, args, input_values):
-        ao = AppObjects()
-        document = ao.document
+        app = adsk.core.Application.get()
+        ui = app.userInterface
+        document = app.activeDocument
+
+        if document is None:
+            return
 
         if document.isSaved:
             document.close(False)
 
-            close_command = ao.ui.commandDefinitions.itemById(self.cmd_id)
+            close_command = ui.commandDefinitions.itemById(self.cmd_id)
             close_command.execute()
 
