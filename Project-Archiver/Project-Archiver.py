@@ -22,7 +22,7 @@ try:
             'The bundled "apper" framework is missing from this installation.\n\n'
             'This normally happens when the add-in was downloaded as a plain zip '
             'of the source repository, which does not contain the apper '
-            'submodule. Install the distribution zip from the dist folder, or '
+            'submodule. Install the distribution zip from the Releases page, or '
             'clone with "git clone --recurse-submodules".'
         )
 

@@ -1,2 +1,5 @@
 .idea/
 .__pycache__/
+
+# Distribution zips are attached to GitHub Releases, not committed.
+/dist/

@@ -8,11 +8,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Download the latest distribution zip, [`Project-Archiver-2.1.1.zip`](dist/Project-Archiver-2.1.1.zip).
+1. Download the latest distribution zip from the [Releases page](../../releases/latest) and unzip it to a permanent location on your computer. The zip is attached to each release.
 
-*Note you should download the zip from the link above. Do not use GitHub's **Download ZIP** button on the repository: that archive does not contain the `apper` submodule and the add-in will fail to initialize.*
+*Do not use GitHub's **Download ZIP** button on the repository: that archive does not contain the `apper` submodule and the add-in will fail to initialize.*
 
-2. Unzip the archive to a permanent location on your computer. The unzipped folder must contain a **Project-Archiver** sub-folder, and inside it both `Project-Archiver.py` and an `apper` folder.
+The unzipped folder must contain a **Project-Archiver** sub-folder, and inside it both `Project-Archiver.py` and an `apper` folder.
 
 *If the downloaded zip will not open, download it again (a partial download is the usual cause), or clone the repository with `git clone --recurse-submodules` and use the `Project-Archiver` folder directly.*
 
@@ -92,7 +92,7 @@ Designs that contain linked components are archived as **.f3z** files, since a s
 **`Initialization Failed ... cannot import name 'AppObjects' from 'apper' (unknown location)`**
 
 The `apper` submodule is missing. This happens when the repository was downloaded with GitHub's
-**Download ZIP** button or cloned without submodules. Install the distribution zip from `dist`, or run:
+**Download ZIP** button or cloned without submodules. Install the distribution zip from the Releases page, or run:
 
     git clone --recurse-submodules https://github.com/tapnair/Project-Archiver.git
 
