@@ -118,6 +118,22 @@ If you already cloned without it, fetch the submodule in place:
 
 Do not run `git submodule add` - the submodule is already declared in `.gitmodules` and adding it again
 creates a second, unused copy.
+
+### Building a distribution<a name="Building-a-distribution"></a>
+
+Distribution zips are attached to GitHub Releases, not committed to the repository. Build one with:
+
+    python tools/build_dist.py
+
+The version comes from `Project-Archiver/Project-Archiver.manifest`; keep `setup.py` in step with it, or the
+build stops with a version mismatch. The zip is written to `dist/`, which is git-ignored, and the script checks
+that the `apper` dependency and the add-in files are present before it reports success.
+
+To publish the build:
+
+    git tag v2.1.2
+    git push origin v2.1.2
+    gh release create v2.1.2 --title v2.1.2 --notes-file notes.md dist/Project-Archiver-2.1.2.zip
    
 ## License
 Samples are licensed under the terms of the [MIT License](http://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for full details.
