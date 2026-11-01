@@ -8,16 +8,13 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project-Archiver-2.1.0.zip)
+1. Download the latest distribution zip from the [`dist`](https://github.com/tapnair/Project-Archiver/tree/master/dist) folder.
 
-*Note you should download from the link above.  The regular git downloads won't get the apper submodule*
+*Note you should download the zip from the link above. Do not use GitHub's **Download ZIP** button on the repository: that archive does not contain the `apper` submodule and the add-in will fail to initialize.*
 
-2. Unzip the archive to a permanent location on your computer
+2. Unzip the archive to a permanent location on your computer. The unzipped folder must contain a **Project-Archiver** sub-folder, and inside it both `Project-Archiver.py` and an `apper` folder.
 
-**For some reason this zip file can get corrupted by github direct download.
-If you are unable to unzip the file, you should just clone the entire repo or download a zip of the entire repo.
-Then you can navigate to the /dist folder to find the actual correct zip file.
-Extract that file to your computer and continue below.**
+*If the downloaded zip will not open, download it again (a partial download is the usual cause), or clone the repository with `git clone --recurse-submodules` and use the `Project-Archiver` folder directly.*
 
 ### Fusion 360  
 
@@ -46,8 +43,9 @@ Extract that file to your computer and continue below.**
 
 ### How to use<a name="How-to-use"></a>
 
-In the data panel navigate to the project you want to archive.
-The add-in will export all Fusion 360 files in the active project.
+Open a design from the project you want to archive, then in the data panel navigate to that project.
+The project of the design that is currently open is the one that gets archived: the add-in will export
+all Fusion 360 files in the active project.
 
 ![](Project-Archiver/resources/dialog.png)
 
@@ -64,17 +62,52 @@ Electronics documents (prj/sch/brd/lbr) can also be archived. Select the **BRD**
 File Name Options allow you to specify the naming convention for output files.  
 If you select 'Document Name' you can choose whether or not to append the version number to the file name.
 
+Select **Include hidden bodies/components?** to export geometry that is currently hidden. Fusion's exporters
+only include visible geometry, so hidden bodies would otherwise be missing from the archive. The add-in turns
+everything on for the export and restores the original visibility afterwards.
+
 Click **OK**.
 
 Fusion will open and export each 3D design. Depending on the size of design and bandwidth this can take some time. 
 Fusion 360 will be busy for the duration of the script running, so it would be advisable to run this on a dedicated machine that you can leav to run for some time. 
 
+Each design is closed again as soon as it has been exported, so memory use stays flat even for large projects.
+If a design cannot be exported, it is skipped and the run continues. At the end a summary is shown, and the full
+list of failures is written to **Project-Archiver-errors.txt** in the output folder.
+
+Designs that contain linked components are archived as **.f3z** files, since a single .f3d cannot store them.
+
+### Troubleshooting<a name="Troubleshooting"></a>
+
+**`Initialization Failed ... cannot import name 'AppObjects' from 'apper' (unknown location)`**
+
+The `apper` submodule is missing. This happens when the repository was downloaded with GitHub's
+**Download ZIP** button or cloned without submodules. Install the distribution zip from `dist`, or run:
+
+    git clone --recurse-submodules https://github.com/tapnair/Project-Archiver.git
+
+**`No active project was found`**
+
+Open a design from the project you want to archive, then run the command again. The add-in archives the
+project that the currently open design belongs to.
+
+**`module 'config' has no attribute 'app_name'`**
+
+Another add-in left a module called `config` in Fusion's shared Python interpreter. Reloading the add-in
+(or restarting Fusion) after updating to this version resolves it.
+
 ### For Developers<a name="For-Developers"></a>
-Clone the repo
 
-Update the apper submodule by browsing to the 'Project-Archiver' sub directory in the unzipped directory and executing:
+Clone the repository including the `apper` submodule:
 
-    git submodule add https://github.com/tapnair/apper
+    git clone --recurse-submodules https://github.com/tapnair/Project-Archiver.git
+
+If you already cloned without it, fetch the submodule in place:
+
+    git submodule update --init --recursive
+
+Do not run `git submodule add` - the submodule is already declared in `.gitmodules` and adding it again
+creates a second, unused copy.
    
 ## License
 Samples are licensed under the terms of the [MIT License](http://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for full details.

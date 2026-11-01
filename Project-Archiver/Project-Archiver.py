@@ -6,18 +6,26 @@
 #  This file is a component of Project-Archiver.                                  ~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import os
-import sys
-from importlib import reload
-
-import adsk.core
 import traceback
 
+import adsk.core
 
-from.startup import setup_app, cleanup_app, get_app_path
+
+from.startup import setup_app, cleanup_app, get_app_path, apper_available
 setup_app(__file__)
 
+my_addin = None
+
 try:
+    if not apper_available(__file__):
+        raise RuntimeError(
+            'The bundled "apper" framework is missing from this installation.\n\n'
+            'This normally happens when the add-in was downloaded as a plain zip '
+            'of the source repository, which does not contain the apper '
+            'submodule. Install the distribution zip from the dist folder, or '
+            'clone with "git clone --recurse-submodules".'
+        )
+
     import config
     import apper
 
@@ -26,7 +34,6 @@ try:
 
     my_addin = apper.FusionApp(config.app_name, config.company_name, False)
     my_addin.root_path = get_app_path(__file__)
-    reload(config)
 
     my_addin.add_command(
         'Export Active Project',
@@ -63,13 +70,17 @@ except:
     ui = app.userInterface
     ui.messageBox('Initialization Failed: {}'.format(traceback.format_exc()))
 
-debug = False
-
 
 def run(context):
+    # Initialization failed and already reported the reason; nothing to start.
+    if my_addin is None:
+        return
+
     my_addin.run_app()
 
 
 def stop(context):
-    my_addin.stop_app()
+    if my_addin is not None:
+        my_addin.stop_app()
+
     cleanup_app(__file__)

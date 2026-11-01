@@ -1,6 +1,3 @@
 [submodule "Project-Archiver/apper"]
 	path = Project-Archiver/apper
 	url = https://github.com/tapnair/apper
-[submodule "apper"]
-	path = apper
-	url = https://github.com/tapnair/apper

@@ -29,8 +29,14 @@ from apper import AppObjects
 
 import config
 
-SKIPPED_FILES = []
+# Errors are collected during a run and shown in a single dialog at the end, so
+# one bad document cannot abort an archive that may take hours to complete.
+EXPORT_ERRORS = []
 ELECTRONICS_ERRORS = []
+
+# Documents that were already open when the run started. Closing them would
+# discard whatever the user had open, so they are left alone.
+PREEXISTING_DOCUMENTS = set()
 
 # Electronics export type name -> (factory method name on the ElectronicsExportManager, file extension)
 ELECTRONICS_EXPORTS = {
@@ -60,8 +66,6 @@ def sanitize_filename(name):
 
 def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
                   include_hidden=False):
-    ao = AppObjects()
-
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
@@ -77,7 +81,8 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
-            open_doc(file)
+            if not open_doc(file):
+                continue
             written_files = []
             hidden_changed = []
             try:
@@ -86,13 +91,11 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
                 output_name = get_name(write_version, name_option)
                 written_files = export_active_doc(output_folder, file_types, output_name)
 
-            # TODO add handling
-            except ValueError as e:
-                ao.ui.messageBox(str(e))
-
-            except AttributeError as e:
-                ao.ui.messageBox(str(e))
-                break
+            except Exception as e:
+                # Record the failure and carry on with the next document. A
+                # single unexportable file used to abort the whole run (or, for
+                # AttributeError, every remaining file in the folder).
+                EXPORT_ERRORS.append("{}: {}".format(file.name, str(e)))
 
             finally:
                 # Restore visibility while this document is still the active one.
@@ -105,7 +108,8 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
             # Only open Fusion-native electronics documents (fprj/fsch/fbrd/flbr).
             # Opening unrelated hub files (drawings, etc.) and reading product
             # data on them raises Fusion's "failed to find product" error.
-            open_doc(file)
+            if not open_doc(file):
+                continue
             try:
                 # Electronics docs are not design products, so the root_comp
                 # based name options in get_name would fail. Use the document
@@ -119,15 +123,32 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
 
 def open_doc(data_file):
+    """Open and activate a data-panel file.
+
+    Returns True on success. On failure the error is recorded and the caller
+    skips the file: continuing here would export whichever document is still
+    active under the wrong name.
+    """
     app = adsk.core.Application.get()
 
     try:
         document = app.documents.open(data_file, True)
-        if document is not None:
-            document.activate()
-    except:
+    except Exception as e:
+        EXPORT_ERRORS.append("{}: could not be opened ({})".format(data_file.name, str(e)))
+        return False
+
+    if document is None:
+        EXPORT_ERRORS.append("{}: could not be opened".format(data_file.name))
+        return False
+
+    # A failed activate() should not skip the file: the document may already be
+    # the active one, and the export below does not depend on it.
+    try:
+        document.activate()
+    except Exception:
         pass
-        # TODO add handling
+
+    return True
 
 
 def is_type_selected(file_types, type_name):
@@ -148,14 +169,29 @@ def any_electronics_selected(file_types):
     return any(is_type_selected(file_types, type_name) for type_name in ELECTRONICS_EXPORTS)
 
 
+def _run_export(export_mgr, export_name, type_name, create_options, written_files):
+    """Create the export options and execute them, recording failures.
+
+    Each format is attempted independently so that, for example, an STL export
+    that Fusion cannot build does not stop the STEP export of the same document
+    (or any later document).
+    """
+    try:
+        export_options = create_options(export_name)
+        if export_options is None:
+            raise RuntimeError('export options could not be created')
+        export_mgr.execute(export_options)
+        written_files.append(export_name)
+    except Exception as e:
+        EXPORT_ERRORS.append("{} ({}): {}".format(os.path.basename(export_name), type_name, str(e)))
+
+
 def export_active_doc(folder, file_types, output_name):
     """Export the active document to every selected format.
 
     Returns the list of paths written, so the caller can wait for those files
     to be flushed to disk before closing the document.
     """
-    global SKIPPED_FILES
-
     ao = AppObjects()
     export_mgr = ao.export_manager
     written_files = []
@@ -170,29 +206,26 @@ def export_active_doc(folder, file_types, output_name):
 
     for type_name, (export_function, extension) in solid_export_functions.items():
         if is_type_selected(file_types, type_name):
-            export_name = folder + output_name + extension
-            export_name = dup_check(export_name)
-            export_options = export_function(export_name)
-            export_mgr.execute(export_options)
-            written_files.append(export_name)
+            export_name = dup_check(folder + output_name + extension)
+            _run_export(export_mgr, export_name, type_name, export_function, written_files)
 
     if is_type_selected(file_types, 'F3D'):
-
+        # A design with external references cannot be stored as a single .f3d.
+        # Fusion archives it as .f3z, which bundles the referenced designs, so
+        # ask for that extension instead of skipping the file (issues #22, #49).
         if ao.document.allDocumentReferences.count > 0:
-            SKIPPED_FILES.append(ao.document.name)
-
+            extension = '.f3z'
         else:
-            export_name = folder + output_name + '.f3d'
-            export_name = dup_check(export_name)
-            export_options = export_mgr.createFusionArchiveExportOptions(export_name)
-            export_mgr.execute(export_options)
-            written_files.append(export_name)
+            extension = '.f3d'
+        export_name = dup_check(folder + output_name + extension)
+        _run_export(export_mgr, export_name, 'F3D',
+                    export_mgr.createFusionArchiveExportOptions, written_files)
 
     if is_type_selected(file_types, 'STL'):
-        stl_export_name = folder + output_name + '.stl'
-        stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
-        export_mgr.execute(stl_options)
-        written_files.append(stl_export_name)
+        stl_export_name = dup_check(folder + output_name + '.stl')
+        _run_export(export_mgr, stl_export_name, 'STL',
+                    lambda name: export_mgr.createSTLExportOptions(ao.design.rootComponent, name),
+                    written_files)
 
     return written_files
 
@@ -225,11 +258,23 @@ def close_active_doc(wait_for_files=None, timeout=10.0):
 
     app = adsk.core.Application.get()
     document = app.activeDocument
-    if document is not None:
-        try:
-            document.close(False)
-        except Exception:
-            pass
+    if document is None:
+        return
+
+    # Never silently discard unsaved work in a document the user already had
+    # open before the archive started.
+    try:
+        keep_open = document.isModified and document.name in PREEXISTING_DOCUMENTS
+    except Exception:
+        keep_open = False
+
+    if keep_open:
+        return
+
+    try:
+        document.close(False)
+    except Exception:
+        pass
 
 
 def show_all_hidden(design):
@@ -359,12 +404,11 @@ def export_electronics_doc(folder, file_types, output_name):
 
 
 def dup_check(name):
-    if os.path.exists(name):
-        base, ext = os.path.splitext(name)
-        base += '-dup'
-        name = base + ext
-        dup_check(name)
-    return name
+    """Return `name`, or the first `-dup` variant that does not exist yet."""
+    if not os.path.exists(name):
+        return name
+    base, ext = os.path.splitext(name)
+    return dup_check(base + '-dup' + ext)
 
 
 def get_electronics_name(write_version):
@@ -409,6 +453,16 @@ def get_name(write_version, option):
     else:
         raise ValueError('Something strange happened')
 
+    # Description / Part Number are optional in Fusion, and an empty name would
+    # produce a file called ".step" in the output folder. Fall back to the
+    # document name instead.
+    if not output_name or not output_name.strip():
+        output_name = ao.app.activeDocument.name
+        if not write_version:
+            version_index = output_name.rfind(' v')
+            if version_index != -1:
+                output_name = output_name[:version_index]
+
     return sanitize_filename(output_name)
 
 
@@ -419,6 +473,27 @@ def update_name_inputs(command_inputs, selection):
         command_inputs.itemById('write_version').isVisible = True
 
 
+def report_errors(ui, output_folder, errors):
+    """Show a bounded error dialog and write the full list beside the exports."""
+    if not errors:
+        return
+
+    max_shown = 15
+    message = "Some files could not be exported:\n\n{}".format("\n".join(errors[:max_shown]))
+    if len(errors) > max_shown:
+        message += "\n\n... and {} more.".format(len(errors) - max_shown)
+
+    report_path = os.path.join(output_folder, 'Project-Archiver-errors.txt')
+    try:
+        with open(report_path, 'w', encoding='utf-8') as report:
+            report.write("\n".join(errors))
+        message += "\n\nFull list written to:\n{}".format(report_path)
+    except OSError:
+        pass
+
+    ui.messageBox(message)
+
+
 class ExportCommand(apper.Fusion360CommandBase):
 
     def on_input_changed(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs,
@@ -427,11 +502,13 @@ class ExportCommand(apper.Fusion360CommandBase):
             update_name_inputs(inputs, changed_input.selectedItem.name)
 
     def on_execute(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, args, input_values):
-        global SKIPPED_FILES
-        global ELECTRONICS_ERRORS
         ao = AppObjects()
 
-        output_folder = input_values['output_folder']
+        output_folder = (input_values['output_folder'] or '').strip()
+        if not output_folder:
+            ao.ui.messageBox('Please enter an output folder.')
+            return
+
         folder_preserve = input_values['folder_preserve_id']
         include_hidden = input_values['include_hidden_id']
 
@@ -440,40 +517,60 @@ class ExportCommand(apper.Fusion360CommandBase):
 
         write_version = input_values['write_version']
         name_option = input_values['name_option_id']
-        root_folder = ao.app.data.activeProject.rootFolder
+
+        # data.activeProject raises RuntimeError: 2 (InternalValidationError)
+        # when the Data Panel is not on a project, e.g. when no design is open
+        # in the modelling workspace (issues #41, #52, #53).
+        try:
+            active_project = ao.app.data.activeProject
+        except Exception:
+            active_project = None
+
+        if active_project is None:
+            ao.ui.messageBox(
+                'No active project was found.\n\n'
+                'Open a design from the project you want to archive, then run '
+                'Project-Archiver again.'
+            )
+            return
+
+        root_folder = active_project.rootFolder
 
         # Make sure we have a folder not a file
         if not output_folder.endswith(os.path.sep):
             output_folder += os.path.sep
 
         # Create the base folder for this output if doesn't exist
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+        try:
+            os.makedirs(output_folder, exist_ok=True)
+        except OSError as e:
+            ao.ui.messageBox('Could not create the output folder:\n{}'.format(str(e)))
+            return
+
+        # Remember what the user already had open so their unsaved work is not
+        # closed (and discarded) by the per-document cleanup.
+        PREEXISTING_DOCUMENTS.clear()
+        try:
+            documents = ao.app.documents
+            for i in range(documents.count):
+                PREEXISTING_DOCUMENTS.add(documents.item(i).name)
+        except Exception:
+            pass
 
         export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
                       include_hidden)
 
-        if len(SKIPPED_FILES) > 0:
-            ao.ui.messageBox(
-                "The following files contained external references and could not be exported as f3d's: {}".format(
-                    SKIPPED_FILES
-                )
-            )
-
-        if len(ELECTRONICS_ERRORS) > 0:
-            ao.ui.messageBox(
-                "Some electronics documents could not be exported:\n{}".format(
-                    "\n".join(ELECTRONICS_ERRORS)
-                )
-            )
-
-        close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
-        close_command.execute()
+        errors = []
+        if EXPORT_ERRORS:
+            errors.append('Designs:')
+            errors.extend(EXPORT_ERRORS)
+        if ELECTRONICS_ERRORS:
+            errors.append('Electronics documents:')
+            errors.extend(ELECTRONICS_ERRORS)
+        report_errors(ao.ui, output_folder, errors)
 
     def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
-        global SKIPPED_FILES
-        global ELECTRONICS_ERRORS
-        SKIPPED_FILES.clear()
+        EXPORT_ERRORS.clear()
         ELECTRONICS_ERRORS.clear()
         default_dir = apper.get_default_dir(config.app_name)
 
