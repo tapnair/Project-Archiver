@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='Project-Archiver',
-    version='2.1.0',
+    version='2.1.1',
     description='A Project Archiving Utility for Fusion 360',
     long_description=long_description,
     packages=['Project-Archiver', 'Project-Archiver.apper.apper', 'Project-Archiver.commands'],

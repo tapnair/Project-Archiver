@@ -8,7 +8,7 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Download the latest distribution zip from the [`dist`](https://github.com/tapnair/Project-Archiver/tree/master/dist) folder.
+1. Download the latest distribution zip, [`Project-Archiver-2.1.1.zip`](dist/Project-Archiver-2.1.1.zip).
 
 *Note you should download the zip from the link above. Do not use GitHub's **Download ZIP** button on the repository: that archive does not contain the `apper` submodule and the add-in will fail to initialize.*
 
@@ -76,6 +76,16 @@ If a design cannot be exported, it is skipped and the run continues. At the end 
 list of failures is written to **Project-Archiver-errors.txt** in the output folder.
 
 Designs that contain linked components are archived as **.f3z** files, since a single .f3d cannot store them.
+
+### What's new in 2.1.1<a name="Changelog"></a>
+
+* Designs are closed as soon as they are exported, so large projects no longer exhaust memory.
+* Characters that are illegal in file names (`/ : * ? " < > |`) are replaced with `-` instead of aborting the run.
+* A document that fails to export is skipped and reported, and the run continues. The full list is written to
+  `Project-Archiver-errors.txt` in the output folder.
+* Designs with linked components are archived as `.f3z` instead of being skipped.
+* New **Include hidden bodies/components?** option.
+* A missing or stale add-in dependency now produces a clear message instead of an initialization traceback.
 
 ### Troubleshooting<a name="Troubleshooting"></a>
 
