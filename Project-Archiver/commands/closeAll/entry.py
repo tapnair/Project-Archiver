@@ -20,6 +20,10 @@ IS_PROMOTED = True
 # Resource location for command icons, here we assume a sub folder in this directory named "resources".
 ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', '')
 
+# Upper limit on close passes in one Close All run, in case a document reports closing but stays open
+MAX_PASSES = 50
+pass_count = 0
+
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
 local_handlers = []
@@ -60,22 +64,22 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
 
 # This event handler is called immediately after the created event since the command has no inputs.
-# It closes the active document and then runs this command again until no saved documents remain.
-# Once done, it reports any files from a previous export that could not be exported.
+# Each run makes one pass closing saved documents, then runs this command again so Fusion can finish
+# the closes before the next pass. Once a pass closes nothing, it reports the results of an export.
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Execute Event')
 
-    document = app.activeDocument
+    global pass_count
+    pass_count += 1
 
-    if document is not None and document.isSaved:
-        document.close(False)
-
+    if archiverUtils.close_documents_pass() and pass_count < MAX_PASSES:
         close_command = ui.commandDefinitions.itemById(CMD_ID)
         close_command.execute()
 
     else:
-        archiverUtils.show_export_summary()
+        pass_count = 0
+        archiverUtils.finish_close_all()
 
 
 # This event handler is called when the command terminates.

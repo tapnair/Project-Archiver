@@ -31,6 +31,9 @@ ELECTRONICS_ERRORS = []
 # These are left open rather than closed after export.
 OPEN_BEFORE_EXPORT = set()
 
+# True from the end of an export until Close All has finished cleaning up after it
+EXPORT_CLEANUP_PENDING = False
+
 # Electronics export type name -> (factory method name on the ElectronicsExportManager, file extension)
 ELECTRONICS_EXPORTS = {
     'BRD': ('createEagleBrdExportOptions', '.brd'),
@@ -91,6 +94,9 @@ def export_project(output_folder, file_types, write_version, name_option, folder
     OPEN_BEFORE_EXPORT.discard(None)
 
     export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
+
+    global EXPORT_CLEANUP_PENDING
+    EXPORT_CLEANUP_PENDING = True
 
 
 def show_export_summary():
@@ -243,6 +249,48 @@ def close_doc(document):
         document.close(False)
     except RuntimeError:
         pass
+
+
+def close_documents_pass() -> bool:
+    """Make one pass closing saved documents, and return True if any closed.
+
+    After an export, only documents the export loaded are closed, including designs an assembly
+    referenced that stay loaded after the assembly closes. Otherwise every saved document is
+    closed. A document can't close while another loaded document references it, so the caller
+    repeats passes, letting Fusion finish each one, until a pass closes nothing. Unsaved
+    documents are never closed.
+    """
+    keep = OPEN_BEFORE_EXPORT if EXPORT_CLEANUP_PENDING else set()
+    progress = False
+
+    for document in [app.documents.item(i) for i in range(app.documents.count)]:
+        if not document.isValid:
+            continue
+
+        data_file_id = get_data_file_id(document)
+        if data_file_id is None or data_file_id in keep:
+            continue
+
+        count = app.documents.count
+        try:
+            closed = document.close(False)
+        except RuntimeError:
+            closed = False
+
+        if closed or app.documents.count < count:
+            progress = True
+
+    return progress
+
+
+def finish_close_all():
+    """Called when Close All is done. Reports the results of an export it was cleaning up after."""
+    global EXPORT_CLEANUP_PENDING
+
+    if EXPORT_CLEANUP_PENDING:
+        EXPORT_CLEANUP_PENDING = False
+        OPEN_BEFORE_EXPORT.clear()
+        show_export_summary()
 
 
 def is_type_selected(file_types, type_name):
