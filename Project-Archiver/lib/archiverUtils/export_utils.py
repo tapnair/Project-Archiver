@@ -52,7 +52,11 @@ def clear_export_messages():
 
 
 def export_project(output_folder, file_types, write_version, name_option, folder_preserve):
-    """Export every document in the active project and report any files that could not be exported."""
+    """Export every document in the active project.
+
+    Files that could not be exported are collected and reported by show_export_summary
+    once the opened documents have been closed.
+    """
     root_folder = app.data.activeProject.rootFolder
 
     # Make sure we have a folder not a file
@@ -65,19 +69,33 @@ def export_project(output_folder, file_types, write_version, name_option, folder
 
     export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
 
+
+def show_export_summary():
+    """Report any files that could not be exported, then clear the list.
+
+    Showing a message box while the exported documents are still open can fail with
+    "failed to find product", so this is called after they have been closed.
+    """
+    messages = []
+
     if len(SKIPPED_FILES) > 0:
-        ui.messageBox(
+        messages.append(
             "The following files contained external references and could not be exported as f3d's: {}".format(
                 SKIPPED_FILES
             )
         )
 
     if len(ELECTRONICS_ERRORS) > 0:
-        ui.messageBox(
+        messages.append(
             "Some electronics documents could not be exported:\n{}".format(
                 "\n".join(ELECTRONICS_ERRORS)
             )
         )
+
+    clear_export_messages()
+
+    for message in messages:
+        ui.messageBox(message)
 
 
 def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):

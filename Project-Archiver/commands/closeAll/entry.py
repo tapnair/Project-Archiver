@@ -61,20 +61,21 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
 # This event handler is called immediately after the created event since the command has no inputs.
 # It closes the active document and then runs this command again until no saved documents remain.
+# Once done, it reports any files from a previous export that could not be exported.
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Execute Event')
 
     document = app.activeDocument
 
-    if document is None:
-        return
-
-    if document.isSaved:
+    if document is not None and document.isSaved:
         document.close(False)
 
         close_command = ui.commandDefinitions.itemById(CMD_ID)
         close_command.execute()
+
+    else:
+        archiverUtils.show_export_summary()
 
 
 # This event handler is called when the command terminates.

@@ -117,7 +117,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
         preserve_input.value
     )
 
-    # Close the documents that were opened for export
+    # Close the documents that were opened for export. Close All shows the export summary when it finishes.
     close_command = ui.commandDefinitions.itemById(config.close_all_cmd_id)
     close_command.execute()
 
