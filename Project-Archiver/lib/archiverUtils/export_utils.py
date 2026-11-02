@@ -18,7 +18,7 @@ try:
 except ImportError:
     HAS_ELECTRON = False
 
-from .file_utils import dup_check
+from .file_utils import dup_check, sanitize_name
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -102,7 +102,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
-            new_folder = os.path.join(output_folder, folder.name, "")
+            new_folder = os.path.join(output_folder, sanitize_name(folder.name), "")
 
             if not os.path.exists(new_folder):
                 os.makedirs(new_folder)
@@ -311,7 +311,7 @@ def get_electronics_name(write_version):
         if version_index != -1:
             doc_name = doc_name[:version_index]
 
-    return doc_name
+    return sanitize_name(doc_name)
 
 
 def get_name(write_version, option):
@@ -336,4 +336,4 @@ def get_name(write_version, option):
     else:
         raise ValueError('Something strange happened')
 
-    return output_name
+    return sanitize_name(output_name)
