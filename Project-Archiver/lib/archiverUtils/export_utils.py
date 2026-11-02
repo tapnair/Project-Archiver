@@ -40,6 +40,18 @@ ELECTRONICS_EXPORTS = {
 ELECTRONICS_EXTENSIONS = {'fprj', 'fsch', 'fbrd', 'flbr'}
 
 
+def get_active_project():
+    """Return the project selected in the Data Panel, or None if Fusion can't provide one.
+
+    There is normally always an active project, but in rare cases Fusion raises an
+    InternalValidationError instead, for example before the Data Panel has loaded.
+    """
+    try:
+        return app.data.activeProject
+    except RuntimeError:
+        return None
+
+
 def get_active_design():
     """Return the Design product of the active document, or None if it has no design."""
     document = app.activeDocument
@@ -57,7 +69,7 @@ def export_project(output_folder, file_types, write_version, name_option, folder
     Files that could not be exported are collected and reported by show_export_summary
     once the opened documents have been closed.
     """
-    root_folder = app.data.activeProject.rootFolder
+    root_folder = get_active_project().rootFolder
 
     # Make sure we have a folder not a file
     if not output_folder.endswith(os.path.sep):

@@ -55,6 +55,15 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Created Event')
 
+    # The command exports the project selected in the Data Panel. In the rare case Fusion
+    # can't provide one, open the Data Panel and don't show the dialog.
+    if archiverUtils.get_active_project() is None:
+        app.data.isDataPanelVisible = True
+        ui.messageBox('Fusion could not find an active project.\n\n'
+                      'In the Data Panel, navigate to the project you want to archive, '
+                      f'then run {CMD_NAME} again.', CMD_NAME)
+        return
+
     archiverUtils.clear_export_messages()
     default_dir = archiverUtils.get_default_dir(config.user_dir_name)
 
