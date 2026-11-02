@@ -27,6 +27,10 @@ SKIPPED_FILES = []
 FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
+# Data file ids of the documents the user already had open when the export started.
+# These are left open rather than closed after export.
+OPEN_BEFORE_EXPORT = set()
+
 # Electronics export type name -> (factory method name on the ElectronicsExportManager, file extension)
 ELECTRONICS_EXPORTS = {
     'BRD': ('createEagleBrdExportOptions', '.brd'),
@@ -80,6 +84,11 @@ def export_project(output_folder, file_types, write_version, name_option, folder
     # Create the base folder for this output if doesn't exist
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
+
+    OPEN_BEFORE_EXPORT.clear()
+    for i in range(app.documents.count):
+        OPEN_BEFORE_EXPORT.add(get_data_file_id(app.documents.item(i)))
+    OPEN_BEFORE_EXPORT.discard(None)
 
     export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
 
@@ -145,7 +154,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
 
 def export_data_file(data_file, output_folder, file_types, write_version, name_option):
-    """Open a design and export it to the selected types.
+    """Open a design, export it, and close it again so memory doesn't grow with the size of the project.
 
     A file that fails is recorded and skipped so the rest of the project is still exported.
     """
@@ -162,9 +171,12 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
     except Exception as e:
         FAILED_FILES.append("{}: {}".format(data_file.name, str(e)))
 
+    finally:
+        close_doc(document)
+
 
 def export_electronics_file(data_file, output_folder, file_types, write_version):
-    """Open an electronics document and export it to the selected EAGLE formats."""
+    """Open an electronics document, export it to the selected EAGLE formats, and close it again."""
     document = open_doc(data_file)
 
     if document is None:
@@ -179,6 +191,9 @@ def export_electronics_file(data_file, output_folder, file_types, write_version)
         export_electronics_doc(output_folder, file_types, output_name)
     except Exception as e:
         ELECTRONICS_ERRORS.append("{}: {}".format(data_file.name, str(e)))
+
+    finally:
+        close_doc(document)
 
 
 def get_data_file_id(document):
@@ -213,6 +228,21 @@ def open_doc(data_file):
         return document
 
     return None
+
+
+def close_doc(document):
+    """Close a document opened for export without saving, unless the user already had it open.
+
+    Fusion sometimes raises "failed to find product" even though the document closed. A document
+    that really doesn't close is still picked up by Close All when the export finishes.
+    """
+    if get_data_file_id(document) in OPEN_BEFORE_EXPORT:
+        return
+
+    try:
+        document.close(False)
+    except RuntimeError:
+        pass
 
 
 def is_type_selected(file_types, type_name):
