@@ -1,10 +1,6 @@
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#  Copyright (c) 2020 by Patrick Rainsberry.                                   ~
-#  :license: Apache2, see LICENSE for more details.                            ~
-#  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#  SampleCommand2.py                                                           ~
-#  This file is a component of Project-Archiver.                               ~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#  Copyright (c) 2020 by Patrick Rainsberry.
+#  :license: Apache2, see LICENSE for more details.
+
 import os
 
 import adsk.core
@@ -22,10 +18,10 @@ try:
 except ImportError:
     HAS_ELECTRON = False
 
-import apper
-from apper import AppObjects
+from .file_utils import dup_check
 
-import config
+app = adsk.core.Application.get()
+ui = app.userInterface
 
 SKIPPED_FILES = []
 ELECTRONICS_ERRORS = []
@@ -44,9 +40,47 @@ ELECTRONICS_EXPORTS = {
 ELECTRONICS_EXTENSIONS = {'fprj', 'fsch', 'fbrd', 'flbr'}
 
 
-def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
-    ao = AppObjects()
+def get_active_design():
+    """Return the Design product of the active document, or None if it has no design."""
+    document = app.activeDocument
+    return adsk.fusion.Design.cast(document.products.itemByProductType('DesignProductType'))
 
+
+def clear_export_messages():
+    SKIPPED_FILES.clear()
+    ELECTRONICS_ERRORS.clear()
+
+
+def export_project(output_folder, file_types, write_version, name_option, folder_preserve):
+    """Export every document in the active project and report any files that could not be exported."""
+    root_folder = app.data.activeProject.rootFolder
+
+    # Make sure we have a folder not a file
+    if not output_folder.endswith(os.path.sep):
+        output_folder += os.path.sep
+
+    # Create the base folder for this output if doesn't exist
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
+
+    if len(SKIPPED_FILES) > 0:
+        ui.messageBox(
+            "The following files contained external references and could not be exported as f3d's: {}".format(
+                SKIPPED_FILES
+            )
+        )
+
+    if len(ELECTRONICS_ERRORS) > 0:
+        ui.messageBox(
+            "Some electronics documents could not be exported:\n{}".format(
+                "\n".join(ELECTRONICS_ERRORS)
+            )
+        )
+
+
+def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
@@ -68,10 +102,10 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
             # TODO add handling
             except ValueError as e:
-                ao.ui.messageBox(str(e))
+                ui.messageBox(str(e))
 
             except AttributeError as e:
-                ao.ui.messageBox(str(e))
+                ui.messageBox(str(e))
                 break
 
         elif (HAS_ELECTRON and any_electronics_selected(file_types)
@@ -91,8 +125,6 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
 
 def open_doc(data_file):
-    app = adsk.core.Application.get()
-
     try:
         document = app.documents.open(data_file, True)
         if document is not None:
@@ -121,10 +153,9 @@ def any_electronics_selected(file_types):
 
 
 def export_active_doc(folder, file_types, output_name):
-    global SKIPPED_FILES
-
-    ao = AppObjects()
-    export_mgr = ao.export_manager
+    document = app.activeDocument
+    design = get_active_design()
+    export_mgr = design.exportManager
 
     # Simple solid-body export types, keyed by the dropdown item name.
     solid_export_functions = {
@@ -143,8 +174,8 @@ def export_active_doc(folder, file_types, output_name):
 
     if is_type_selected(file_types, 'F3D'):
 
-        if ao.document.allDocumentReferences.count > 0:
-            SKIPPED_FILES.append(ao.document.name)
+        if document.allDocumentReferences.count > 0:
+            SKIPPED_FILES.append(document.name)
 
         else:
             export_name = folder + output_name + '.f3d'
@@ -154,7 +185,7 @@ def export_active_doc(folder, file_types, output_name):
 
     if is_type_selected(file_types, 'STL'):
         stl_export_name = folder + output_name + '.stl'
-        stl_options = export_mgr.createSTLExportOptions(ao.design.rootComponent, stl_export_name)
+        stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
         export_mgr.execute(stl_options)
 
 
@@ -168,8 +199,6 @@ def _export_one_electronics_format(product, type_name, folder, output_name):
     method exists before calling it and tolerate any failure by recording it
     rather than aborting the whole archive run.
     """
-    global ELECTRONICS_ERRORS
-
     factory_name, extension = ELECTRONICS_EXPORTS[type_name]
 
     try:
@@ -213,8 +242,6 @@ def export_electronics_doc(folder, file_types, output_name):
     if not HAS_ELECTRON:
         return
 
-    app = adsk.core.Application.get()
-
     # The active product may not resolve immediately after opening certain
     # documents; treat that as "nothing to export here" rather than erroring.
     try:
@@ -251,15 +278,6 @@ def export_electronics_doc(folder, file_types, output_name):
             _export_one_electronics_format(ecad_design.board, 'BRD', folder, output_name)
 
 
-def dup_check(name):
-    if os.path.exists(name):
-        base, ext = os.path.splitext(name)
-        base += '-dup'
-        name = base + ext
-        dup_check(name)
-    return name
-
-
 def get_electronics_name(write_version):
     """Derive an output name for an electronics document.
 
@@ -268,7 +286,6 @@ def get_electronics_name(write_version):
     document name, optionally stripping the trailing version suffix to match
     the behavior of the 'Document Name' option.
     """
-    app = adsk.core.Application.get()
     doc_name = app.activeDocument.name
 
     if not write_version:
@@ -280,12 +297,11 @@ def get_electronics_name(write_version):
 
 
 def get_name(write_version, option):
-    ao = AppObjects()
     output_name = ''
 
     if option == 'Document Name':
 
-        doc_name = ao.app.activeDocument.name
+        doc_name = app.activeDocument.name
 
         if not write_version:
             version_index = doc_name.rfind(' v')
@@ -294,106 +310,12 @@ def get_name(write_version, option):
         output_name = doc_name
 
     elif option == 'Description':
-        output_name = ao.root_comp.description
+        output_name = get_active_design().rootComponent.description
 
     elif option == 'Part Number':
-        output_name = ao.root_comp.partNumber
+        output_name = get_active_design().rootComponent.partNumber
 
     else:
         raise ValueError('Something strange happened')
 
     return output_name
-
-
-def update_name_inputs(command_inputs, selection):
-    command_inputs.itemById('write_version').isVisible = False
-
-    if selection == 'Document Name':
-        command_inputs.itemById('write_version').isVisible = True
-
-
-class ExportCommand(apper.Fusion360CommandBase):
-
-    def on_input_changed(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs,
-                         changed_input, input_values):
-        if changed_input.id == 'name_option_id':
-            update_name_inputs(inputs, changed_input.selectedItem.name)
-
-    def on_execute(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, args, input_values):
-        global SKIPPED_FILES
-        global ELECTRONICS_ERRORS
-        ao = AppObjects()
-
-        output_folder = input_values['output_folder']
-        folder_preserve = input_values['folder_preserve_id']
-
-        # TODO broken?????
-        file_types = inputs.itemById('file_types_input').listItems
-
-        write_version = input_values['write_version']
-        name_option = input_values['name_option_id']
-        root_folder = ao.app.data.activeProject.rootFolder
-
-        # Make sure we have a folder not a file
-        if not output_folder.endswith(os.path.sep):
-            output_folder += os.path.sep
-
-        # Create the base folder for this output if doesn't exist
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-
-        export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
-
-        if len(SKIPPED_FILES) > 0:
-            ao.ui.messageBox(
-                "The following files contained external references and could not be exported as f3d's: {}".format(
-                    SKIPPED_FILES
-                )
-            )
-
-        if len(ELECTRONICS_ERRORS) > 0:
-            ao.ui.messageBox(
-                "Some electronics documents could not be exported:\n{}".format(
-                    "\n".join(ELECTRONICS_ERRORS)
-                )
-            )
-
-        close_command = ao.ui.commandDefinitions.itemById(self.fusion_app.command_id_from_name(config.close_cmd_id))
-        close_command.execute()
-
-    def on_create(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs):
-        global SKIPPED_FILES
-        global ELECTRONICS_ERRORS
-        SKIPPED_FILES.clear()
-        ELECTRONICS_ERRORS.clear()
-        default_dir = apper.get_default_dir(config.app_name)
-
-        inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
-
-        drop_input_list = inputs.addDropDownCommandInput('file_types_input', 'Export Types',
-                                                         adsk.core.DropDownStyles.CheckBoxDropDownStyle)
-        drop_input_list = drop_input_list.listItems
-        drop_input_list.add('IGES', False)
-        drop_input_list.add('STEP', True)
-        drop_input_list.add('SAT', False)
-        drop_input_list.add('SMT', False)
-        drop_input_list.add('F3D', False)
-        drop_input_list.add('STL', False)
-        drop_input_list.add('BRD', False)
-        drop_input_list.add('SCH', False)
-        drop_input_list.add('LBR', False)
-
-        name_option_group = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
-                                                                   adsk.core.DropDownStyles.TextListDropDownStyle)
-        name_option_group.listItems.add('Document Name', True)
-        name_option_group.listItems.add('Description', False)
-        name_option_group.listItems.add('Part Number', False)
-        name_option_group.isVisible = True
-
-        preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
-        preserve_input.isVisible = True
-
-        version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
-        version_input.isVisible = False
-
-        update_name_inputs(inputs, 'Document Name')

@@ -1,0 +1,153 @@
+#  Copyright (c) 2020 by Patrick Rainsberry.
+#  :license: Apache2, see LICENSE for more details.
+
+import adsk.core
+import os
+from ...lib import fusionAddInUtils as futil
+from ...lib import archiverUtils
+from ... import config
+app = adsk.core.Application.get()
+ui = app.userInterface
+
+
+CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_exportProject'
+CMD_NAME = 'Export Active Project'
+CMD_Description = 'Exports all Fusion Documents in the currently active project'
+
+# Specify that the command will be promoted to the panel.
+IS_PROMOTED = True
+
+# Resource location for command icons, here we assume a sub folder in this directory named "resources".
+ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', '')
+
+# Local list of event handlers used to maintain a reference so
+# they are not released and garbage collected.
+local_handlers = []
+
+
+# Executed when add-in is run.
+def start():
+    # Create a command Definition.
+    cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
+
+    # Define an event handler for the command created event. It will be called when the button is clicked.
+    futil.add_handler(cmd_def.commandCreated, command_created)
+
+    # ******** Add a button into the UI so the user can run the command. ********
+    # Get the Archive panel on the Tools tab, creating it if necessary.
+    panel = archiverUtils.get_archive_panel()
+
+    # Create the button command control in the UI.
+    control = panel.controls.addCommand(cmd_def)
+
+    # Specify if the command is promoted to the main toolbar.
+    control.isPromoted = IS_PROMOTED
+
+
+# Executed when add-in is stopped.
+def stop():
+    archiverUtils.remove_command(CMD_ID)
+
+
+# Function that is called when a user clicks the corresponding button in the UI.
+# This defines the contents of the command dialog and connects to the command related events.
+def command_created(args: adsk.core.CommandCreatedEventArgs):
+    # General logging for debug.
+    futil.log(f'{CMD_NAME} Command Created Event')
+
+    archiverUtils.clear_export_messages()
+    default_dir = archiverUtils.get_default_dir(config.user_dir_name)
+
+    # https://help.autodesk.com/view/fusion360/ENU/?contextId=CommandInputs
+    inputs = args.command.commandInputs
+
+    inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
+
+    file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Export Types',
+                                                      adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+    file_types_list = file_types_input.listItems
+    file_types_list.add('IGES', False)
+    file_types_list.add('STEP', True)
+    file_types_list.add('SAT', False)
+    file_types_list.add('SMT', False)
+    file_types_list.add('F3D', False)
+    file_types_list.add('STL', False)
+    file_types_list.add('BRD', False)
+    file_types_list.add('SCH', False)
+    file_types_list.add('LBR', False)
+
+    name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
+                                                       adsk.core.DropDownStyles.TextListDropDownStyle)
+    name_option_input.listItems.add('Document Name', True)
+    name_option_input.listItems.add('Description', False)
+    name_option_input.listItems.add('Part Number', False)
+    name_option_input.isVisible = True
+
+    preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
+    preserve_input.isVisible = True
+
+    version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
+    version_input.isVisible = False
+
+    update_name_inputs(inputs, 'Document Name')
+
+    futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
+    futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
+    futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
+
+
+# This event handler is called when the user clicks the OK button in the command dialog.
+def command_execute(args: adsk.core.CommandEventArgs):
+    # General logging for debug.
+    futil.log(f'{CMD_NAME} Command Execute Event')
+
+    # Get a reference to your command's inputs.
+    inputs = args.command.commandInputs
+    output_folder_input: adsk.core.StringValueCommandInput = inputs.itemById('output_folder')
+    file_types_input: adsk.core.DropDownCommandInput = inputs.itemById('file_types_input')
+    name_option_input: adsk.core.DropDownCommandInput = inputs.itemById('name_option_id')
+    preserve_input: adsk.core.BoolValueCommandInput = inputs.itemById('folder_preserve_id')
+    version_input: adsk.core.BoolValueCommandInput = inputs.itemById('write_version')
+
+    archiverUtils.export_project(
+        output_folder_input.value,
+        file_types_input.listItems,
+        version_input.value,
+        name_option_input.selectedItem.name,
+        preserve_input.value
+    )
+
+    # Close the documents that were opened for export
+    close_command = ui.commandDefinitions.itemById(config.close_all_cmd_id)
+    close_command.execute()
+
+
+# This event handler is called when the user changes anything in the command dialog
+# allowing you to modify values of other inputs based on that change.
+def command_input_changed(args: adsk.core.InputChangedEventArgs):
+    changed_input = args.input
+    inputs = args.inputs
+
+    # General logging for debug.
+    futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
+
+    if changed_input.id == 'name_option_id':
+        name_option_input: adsk.core.DropDownCommandInput = changed_input
+        update_name_inputs(inputs, name_option_input.selectedItem.name)
+
+
+# Only show the write version option when naming files by document name.
+def update_name_inputs(command_inputs: adsk.core.CommandInputs, selection: str):
+    command_inputs.itemById('write_version').isVisible = False
+
+    if selection == 'Document Name':
+        command_inputs.itemById('write_version').isVisible = True
+
+
+# This event handler is called when the command terminates.
+def command_destroy(args: adsk.core.CommandEventArgs):
+    # General logging for debug.
+    futil.log(f'{CMD_NAME} Command Destroy Event')
+
+    global local_handlers
+    local_handlers = []

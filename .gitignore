@@ -1,2 +1,5 @@
+__pycache__/
 .idea/
-.__pycache__/
+.vscode/
+.env
+.DS_Store

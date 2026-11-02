@@ -8,16 +8,11 @@ The archiver script will open all Fusion 360 3D data in a project and export it 
 ----
 
 ### How to install<a name="How-to-install"></a>
-1. Click the latest link and download the [latest distribution](https://github.com/tapnair/Project-Archiver/blob/master/dist/Project-Archiver-2.1.0.zip)
+1. Download **Project-Archiver.zip** from the [latest release](https://github.com/tapnair/Project-Archiver/releases/latest/download/Project-Archiver.zip)
 
-*Note you should download from the link above.  The regular git downloads won't get the apper submodule*
+*Don't use the "Source code" downloads. They extract to a folder with the version in its name, and Fusion won't load it.*
 
 2. Unzip the archive to a permanent location on your computer
-
-**For some reason this zip file can get corrupted by github direct download.
-If you are unable to unzip the file, you should just clone the entire repo or download a zip of the entire repo.
-Then you can navigate to the /dist folder to find the actual correct zip file.
-Extract that file to your computer and continue below.**
 
 ### Fusion 360  
 
@@ -38,7 +33,7 @@ Extract that file to your computer and continue below.**
 
    ![](Project-Archiver/resources/run_add_in.png)
 
-6. Click the ProjectArchiver Tab and you should see **Archive** Panel and command.
+6. In the **Design** workspace, click the **Tools** tab and you should see the **Archive** panel and commands.
 
 	![](Project-Archiver/resources/button.png)
 
@@ -70,14 +65,16 @@ Fusion will open and export each 3D design. Depending on the size of design and 
 Fusion 360 will be busy for the duration of the script running, so it would be advisable to run this on a dedicated machine that you can leav to run for some time. 
 
 ### For Developers<a name="For-Developers"></a>
-Clone the repo
+This add-in is built on the standard Fusion Python add-in template and has no external dependencies.
 
-Update the apper submodule by browsing to the 'Project-Archiver' sub directory in the unzipped directory and executing:
+1. Clone the repo
+2. In Fusion, open **Scripts and Add-Ins**, click the "+" and select **Script or add-in from device**
+3. Browse to the **Project-Archiver** sub-folder of the cloned repo
 
-    git submodule add https://github.com/tapnair/apper
-   
+See [Python Add-in Template](https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-DF32F126-366B-45C0-88B0-CEB46F5A9BE8) for details on the add-in structure.
+
 ## License
-Samples are licensed under the terms of the [MIT License](http://opensource.org/licenses/MIT). Please see the [LICENSE](LICENSE) file for full details.
+Licensed under the terms of the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please see the [LICENSE](LICENSE) file for full details.
 
 ## Written by
 
