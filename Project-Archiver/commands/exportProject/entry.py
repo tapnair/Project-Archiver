@@ -81,9 +81,6 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     file_types_list.add('SMT', False)
     file_types_list.add('F3D', False)
     file_types_list.add('STL', False)
-    file_types_list.add('BRD', False)
-    file_types_list.add('SCH', False)
-    file_types_list.add('LBR', False)
 
     name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
                                                        adsk.core.DropDownStyles.TextListDropDownStyle)
@@ -94,6 +91,11 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
     preserve_input.isVisible = True
+
+    # Only offered when this version of Fusion supports exporting electronics documents
+    electronics_input = inputs.addBoolValueInput('export_electronics', 'Export electronics documents?', True, '', False)
+    electronics_input.tooltip = 'Exports boards, schematics and libraries as EAGLE .brd, .sch and .lbr files'
+    electronics_input.isVisible = archiverUtils.HAS_ELECTRON
 
     version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
     version_input.isVisible = False
@@ -117,13 +119,15 @@ def command_execute(args: adsk.core.CommandEventArgs):
     name_option_input: adsk.core.DropDownCommandInput = inputs.itemById('name_option_id')
     preserve_input: adsk.core.BoolValueCommandInput = inputs.itemById('folder_preserve_id')
     version_input: adsk.core.BoolValueCommandInput = inputs.itemById('write_version')
+    electronics_input: adsk.core.BoolValueCommandInput = inputs.itemById('export_electronics')
 
     archiverUtils.export_project(
         output_folder_input.value,
         file_types_input.listItems,
         version_input.value,
         name_option_input.selectedItem.name,
-        preserve_input.value
+        preserve_input.value,
+        electronics_input.value
     )
 
     # Close the documents that were opened for export. Close All shows the export summary when it finishes.

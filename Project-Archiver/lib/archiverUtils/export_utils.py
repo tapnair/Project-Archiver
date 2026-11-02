@@ -42,10 +42,11 @@ ELECTRONICS_EXPORTS = {
 }
 
 # Fusion-native data-panel extensions for electronics documents:
-# fprj = electronics design (umbrella), fsch = schematic, fbrd = 2D PCB board,
-# flbr = library. These are the document extensions in the hub, distinct from
-# the EAGLE export extensions (.sch/.brd/.lbr) produced on export.
-ELECTRONICS_EXTENSIONS = {'fprj', 'fsch', 'fbrd', 'flbr'}
+# fsch = schematic, fbrd = 2D PCB board, flbr = library. These are the document
+# extensions in the hub, distinct from the EAGLE export extensions (.sch/.brd/.lbr)
+# produced on export. An electronics design (fprj) is skipped: its schematic and
+# board are separate fsch and fbrd files that are exported on their own.
+ELECTRONICS_EXTENSIONS = {'fsch', 'fbrd', 'flbr'}
 
 
 def get_active_project():
@@ -72,7 +73,7 @@ def clear_export_messages():
     ELECTRONICS_ERRORS.clear()
 
 
-def export_project(output_folder, file_types, write_version, name_option, folder_preserve):
+def export_project(output_folder, file_types, write_version, name_option, folder_preserve, export_electronics):
     """Export every document in the active project.
 
     Files that could not be exported are collected and reported by show_export_summary
@@ -93,7 +94,8 @@ def export_project(output_folder, file_types, write_version, name_option, folder
         OPEN_BEFORE_EXPORT.add(get_data_file_id(app.documents.item(i)))
     OPEN_BEFORE_EXPORT.discard(None)
 
-    export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve)
+    export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
+                  export_electronics)
 
     global EXPORT_CLEANUP_PENDING
     EXPORT_CLEANUP_PENDING = True
@@ -134,7 +136,8 @@ def show_export_summary():
         ui.messageBox(message)
 
 
-def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve):
+def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
+                  export_electronics):
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
@@ -145,18 +148,18 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
         else:
             new_folder = output_folder
 
-        export_folder(folder, new_folder, file_types, write_version, name_option, folder_preserve)
+        export_folder(folder, new_folder, file_types, write_version, name_option, folder_preserve,
+                      export_electronics)
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
             export_data_file(file, output_folder, file_types, write_version, name_option)
 
-        elif (HAS_ELECTRON and any_electronics_selected(file_types)
-                and file.fileExtension in ELECTRONICS_EXTENSIONS):
-            # Only open Fusion-native electronics documents (fprj/fsch/fbrd/flbr).
+        elif HAS_ELECTRON and export_electronics and file.fileExtension in ELECTRONICS_EXTENSIONS:
+            # Only open Fusion-native electronics documents (fsch/fbrd/flbr).
             # Opening unrelated hub files (drawings, etc.) and reading product
             # data on them raises Fusion's "failed to find product" error.
-            export_electronics_file(file, output_folder, file_types, write_version)
+            export_electronics_file(file, output_folder, write_version)
 
 
 def export_data_file(data_file, output_folder, file_types, write_version, name_option):
@@ -181,8 +184,8 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
         close_doc(document)
 
 
-def export_electronics_file(data_file, output_folder, file_types, write_version):
-    """Open an electronics document, export it to the selected EAGLE formats, and close it again."""
+def export_electronics_file(data_file, output_folder, write_version):
+    """Open an electronics document, export it to its EAGLE format, and close it again."""
     document = open_doc(data_file)
 
     if document is None:
@@ -194,7 +197,7 @@ def export_electronics_file(data_file, output_folder, file_types, write_version)
         # based name options in get_name would fail. Use the document
         # name directly (optionally stripped of its version suffix).
         output_name = get_document_name(write_version)
-        export_electronics_doc(output_folder, file_types, output_name)
+        export_electronics_doc(output_folder, output_name)
     except Exception as e:
         ELECTRONICS_ERRORS.append("{}: {}".format(data_file.name, str(e)))
 
@@ -313,11 +316,6 @@ def is_type_selected(file_types, type_name):
     return False
 
 
-def any_electronics_selected(file_types):
-    """Return True if any electronics export type is checked in the dropdown."""
-    return any(is_type_selected(file_types, type_name) for type_name in ELECTRONICS_EXPORTS)
-
-
 def export_active_doc(folder, file_types, output_name):
     document = app.activeDocument
     design = get_active_design()
@@ -398,8 +396,11 @@ def _export_one_electronics_format(product, type_name, folder, output_name):
         ELECTRONICS_ERRORS.append("{}: {} export error: {}".format(output_name, type_name, str(e)))
 
 
-def export_electronics_doc(folder, file_types, output_name):
-    """Export the active electronics document to the selected EAGLE formats.
+def export_electronics_doc(folder, output_name):
+    """Export the active electronics document to its EAGLE format.
+
+    Each electronics document type has exactly one export format: a board exports
+    as .brd, a schematic as .sch and a library as .lbr.
 
     Determines the document type by casting the active product (per the Fusion
     Electronics API pattern) and routes to the matching export manager(s).
@@ -422,27 +423,15 @@ def export_electronics_doc(folder, file_types, output_name):
     board = adsk.electron.Board.cast(product)
     schematic = adsk.electron.Schematic.cast(product)
     library = adsk.electron.Library.cast(product)
-    ecad_design = adsk.electron.EcadDesign.cast(product)
 
     if board is not None:
-        if is_type_selected(file_types, 'BRD'):
-            _export_one_electronics_format(board, 'BRD', folder, output_name)
+        _export_one_electronics_format(board, 'BRD', folder, output_name)
 
     elif schematic is not None:
-        if is_type_selected(file_types, 'SCH'):
-            _export_one_electronics_format(schematic, 'SCH', folder, output_name)
+        _export_one_electronics_format(schematic, 'SCH', folder, output_name)
 
     elif library is not None:
-        if is_type_selected(file_types, 'LBR'):
-            _export_one_electronics_format(library, 'LBR', folder, output_name)
-
-    elif ecad_design is not None:
-        # An electronics design ties together a schematic and board; export each
-        # through its own product so the right export manager is used.
-        if is_type_selected(file_types, 'SCH') and ecad_design.schematic is not None:
-            _export_one_electronics_format(ecad_design.schematic, 'SCH', folder, output_name)
-        if is_type_selected(file_types, 'BRD') and ecad_design.board is not None:
-            _export_one_electronics_format(ecad_design.board, 'BRD', folder, output_name)
+        _export_one_electronics_format(library, 'LBR', folder, output_name)
 
 
 def get_document_name(write_version):
