@@ -24,6 +24,7 @@ app = adsk.core.Application.get()
 ui = app.userInterface
 
 SKIPPED_FILES = []
+FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
 # Electronics export type name -> (factory method name on the ElectronicsExportManager, file extension)
@@ -60,6 +61,7 @@ def get_active_design():
 
 def clear_export_messages():
     SKIPPED_FILES.clear()
+    FAILED_FILES.clear()
     ELECTRONICS_ERRORS.clear()
 
 
@@ -97,6 +99,13 @@ def show_export_summary():
             )
         )
 
+    if len(FAILED_FILES) > 0:
+        messages.append(
+            "The following files could not be exported:\n{}".format(
+                "\n".join(FAILED_FILES)
+            )
+        )
+
     if len(ELECTRONICS_ERRORS) > 0:
         messages.append(
             "Some electronics documents could not be exported:\n{}".format(
@@ -125,43 +134,85 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
-            open_doc(file)
-            try:
-                output_name = get_name(write_version, name_option)
-                export_active_doc(output_folder, file_types, output_name)
-
-            # TODO add handling
-            except ValueError as e:
-                ui.messageBox(str(e))
-
-            except AttributeError as e:
-                ui.messageBox(str(e))
-                break
+            export_data_file(file, output_folder, file_types, write_version, name_option)
 
         elif (HAS_ELECTRON and any_electronics_selected(file_types)
                 and file.fileExtension in ELECTRONICS_EXTENSIONS):
             # Only open Fusion-native electronics documents (fprj/fsch/fbrd/flbr).
             # Opening unrelated hub files (drawings, etc.) and reading product
             # data on them raises Fusion's "failed to find product" error.
-            open_doc(file)
-            try:
-                # Electronics docs are not design products, so the root_comp
-                # based name options in get_name would fail. Use the document
-                # name directly (optionally stripped of its version suffix).
-                output_name = get_document_name(write_version)
-                export_electronics_doc(output_folder, file_types, output_name)
-            except Exception as e:
-                ELECTRONICS_ERRORS.append("{}: {}".format(file.name, str(e)))
+            export_electronics_file(file, output_folder, file_types, write_version)
+
+
+def export_data_file(data_file, output_folder, file_types, write_version, name_option):
+    """Open a design and export it to the selected types.
+
+    A file that fails is recorded and skipped so the rest of the project is still exported.
+    """
+    document = open_doc(data_file)
+
+    if document is None:
+        FAILED_FILES.append("{}: could not be opened".format(data_file.name))
+        return
+
+    try:
+        output_name = get_name(write_version, name_option)
+        export_active_doc(output_folder, file_types, output_name)
+
+    except Exception as e:
+        FAILED_FILES.append("{}: {}".format(data_file.name, str(e)))
+
+
+def export_electronics_file(data_file, output_folder, file_types, write_version):
+    """Open an electronics document and export it to the selected EAGLE formats."""
+    document = open_doc(data_file)
+
+    if document is None:
+        ELECTRONICS_ERRORS.append("{}: could not be opened".format(data_file.name))
+        return
+
+    try:
+        # Electronics docs are not design products, so the root_comp
+        # based name options in get_name would fail. Use the document
+        # name directly (optionally stripped of its version suffix).
+        output_name = get_document_name(write_version)
+        export_electronics_doc(output_folder, file_types, output_name)
+    except Exception as e:
+        ELECTRONICS_ERRORS.append("{}: {}".format(data_file.name, str(e)))
+
+
+def get_data_file_id(document):
+    """Return the id of the data file a document was opened from, or None for an unsaved document."""
+    try:
+        data_file = document.dataFile
+        return data_file.id if data_file else None
+    except RuntimeError:
+        return None
 
 
 def open_doc(data_file):
+    """Open and activate a data file, returning its document, or None if it didn't open.
+
+    Fusion sometimes raises "failed to find product" even though the document opened,
+    so success is judged by whether the requested document ended up active.
+    """
     try:
         document = app.documents.open(data_file, True)
         if document is not None:
+            # A design that can't be loaded, such as an upload that never finished
+            # processing, opens as an empty unsaved placeholder instead
+            if not document.isSaved:
+                document.close(False)
+                return None
             document.activate()
-    except:
+    except RuntimeError:
         pass
-        # TODO add handling
+
+    document = app.activeDocument
+    if document is not None and get_data_file_id(document) == data_file.id:
+        return document
+
+    return None
 
 
 def is_type_selected(file_types, type_name):
