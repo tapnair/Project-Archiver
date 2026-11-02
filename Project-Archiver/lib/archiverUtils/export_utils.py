@@ -214,24 +214,31 @@ def get_data_file_id(document):
 def open_doc(data_file):
     """Open and activate a data file, returning its document, or None if it didn't open.
 
-    Fusion sometimes raises "failed to find product" even though the document opened,
-    so success is judged by whether the requested document ended up active.
+    Opening one document can load several: an electronics schematic or board loads its whole
+    electronics design, and the document open returns isn't always the one requested. Fusion
+    also sometimes raises "failed to find product" even though the document opened. So the
+    requested document is found among the open documents by its data file.
     """
     try:
         document = app.documents.open(data_file, True)
-        if document is not None:
-            # A design that can't be loaded, such as an upload that never finished
-            # processing, opens as an empty unsaved placeholder instead
-            if not document.isSaved:
-                document.close(False)
-                return None
-            document.activate()
+
+        # A design that can't be loaded, such as an upload that never finished
+        # processing, opens as an empty unsaved placeholder instead
+        if document is not None and not document.isSaved:
+            document.close(False)
+            return None
     except RuntimeError:
         pass
 
-    document = app.activeDocument
-    if document is not None and get_data_file_id(document) == data_file.id:
-        return document
+    for i in range(app.documents.count):
+        document = app.documents.item(i)
+        if get_data_file_id(document) == data_file.id:
+            try:
+                document.activate()
+            except RuntimeError:
+                pass
+            if get_data_file_id(app.activeDocument) == data_file.id:
+                return document
 
     return None
 
