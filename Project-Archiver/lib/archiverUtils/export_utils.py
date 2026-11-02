@@ -136,7 +136,7 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
                 # Electronics docs are not design products, so the root_comp
                 # based name options in get_name would fail. Use the document
                 # name directly (optionally stripped of its version suffix).
-                output_name = get_electronics_name(write_version)
+                output_name = get_document_name(write_version)
                 export_electronics_doc(output_folder, file_types, output_name)
             except Exception as e:
                 ELECTRONICS_ERRORS.append("{}: {}".format(file.name, str(e)))
@@ -297,13 +297,10 @@ def export_electronics_doc(folder, file_types, output_name):
             _export_one_electronics_format(ecad_design.board, 'BRD', folder, output_name)
 
 
-def get_electronics_name(write_version):
-    """Derive an output name for an electronics document.
+def get_document_name(write_version):
+    """Derive an output name from the active document's name.
 
-    Electronics documents are not design products, so the Description / Part
-    Number options (which read root_comp) do not apply. We always use the
-    document name, optionally stripping the trailing version suffix to match
-    the behavior of the 'Document Name' option.
+    The trailing version suffix (e.g. " v3") is removed unless write_version is set.
     """
     doc_name = app.activeDocument.name
 
@@ -316,17 +313,12 @@ def get_electronics_name(write_version):
 
 
 def get_name(write_version, option):
-    output_name = ''
+    """Derive an output name for a design using the selected File Name Option.
 
+    Falls back to the document name when the description or part number is empty.
+    """
     if option == 'Document Name':
-
-        doc_name = app.activeDocument.name
-
-        if not write_version:
-            version_index = doc_name.rfind(' v')
-            if version_index != -1:
-                doc_name = doc_name[:version_index]
-        output_name = doc_name
+        return get_document_name(write_version)
 
     elif option == 'Description':
         output_name = get_active_design().rootComponent.description
@@ -337,4 +329,8 @@ def get_name(write_version, option):
     else:
         raise ValueError('Something strange happened')
 
-    return sanitize_name(output_name)
+    output_name = sanitize_name(output_name)
+    if not output_name:
+        output_name = get_document_name(write_version)
+
+    return output_name
