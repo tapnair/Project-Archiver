@@ -72,7 +72,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
 
-    file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Export Types',
+    file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Design Export Types',
                                                       adsk.core.DropDownStyles.CheckBoxDropDownStyle)
     file_types_list = file_types_input.listItems
     file_types_list.add('IGES', False)
@@ -81,6 +81,15 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     file_types_list.add('SMT', False)
     file_types_list.add('F3D', False)
     file_types_list.add('STL', False)
+
+    # Only offered when this version of Fusion supports exporting drawings
+    drawing_types_input = inputs.addDropDownCommandInput('drawing_types_input', 'Drawing Export Types',
+                                                         adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+    drawing_types_list = drawing_types_input.listItems
+    drawing_types_list.add('PDF', True)
+    drawing_types_list.add('DXF', False)
+    drawing_types_list.add('DWG', False)
+    drawing_types_input.isVisible = archiverUtils.HAS_DRAWING
 
     name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
                                                        adsk.core.DropDownStyles.TextListDropDownStyle)
@@ -116,6 +125,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
     output_folder_input: adsk.core.StringValueCommandInput = inputs.itemById('output_folder')
     file_types_input: adsk.core.DropDownCommandInput = inputs.itemById('file_types_input')
+    drawing_types_input: adsk.core.DropDownCommandInput = inputs.itemById('drawing_types_input')
     name_option_input: adsk.core.DropDownCommandInput = inputs.itemById('name_option_id')
     preserve_input: adsk.core.BoolValueCommandInput = inputs.itemById('folder_preserve_id')
     version_input: adsk.core.BoolValueCommandInput = inputs.itemById('write_version')
@@ -124,6 +134,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     archiverUtils.export_project(
         output_folder_input.value,
         file_types_input.listItems,
+        drawing_types_input.listItems,
         version_input.value,
         name_option_input.selectedItem.name,
         preserve_input.value,

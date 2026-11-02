@@ -18,6 +18,13 @@ try:
 except ImportError:
     HAS_ELECTRON = False
 
+# Feature-detect the Drawing API for the same reason
+try:
+    import adsk.drawing
+    HAS_DRAWING = True
+except ImportError:
+    HAS_DRAWING = False
+
 from .file_utils import dup_check, sanitize_name
 
 app = adsk.core.Application.get()
@@ -48,6 +55,14 @@ ELECTRONICS_EXPORTS = {
 # board are separate fsch and fbrd files that are exported on their own.
 ELECTRONICS_EXTENSIONS = {'fsch', 'fbrd', 'flbr'}
 
+# Drawing export type name -> (factory method name on the DrawingExportManager, file extension).
+# DXF and DWG export are preview APIs, so each factory is checked before it's used.
+DRAWING_EXPORTS = {
+    'PDF': ('createPDFExportOptions', '.pdf'),
+    'DXF': ('createDXFExportOptions', '.dxf'),
+    'DWG': ('createDWGExportOptions', '.dwg'),
+}
+
 
 def get_active_project():
     """Return the project selected in the Data Panel, or None if Fusion can't provide one.
@@ -73,7 +88,8 @@ def clear_export_messages():
     ELECTRONICS_ERRORS.clear()
 
 
-def export_project(output_folder, file_types, write_version, name_option, folder_preserve, export_electronics):
+def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
+                   export_electronics):
     """Export every document in the active project.
 
     Files that could not be exported are collected and reported by show_export_summary
@@ -94,8 +110,8 @@ def export_project(output_folder, file_types, write_version, name_option, folder
         OPEN_BEFORE_EXPORT.add(get_data_file_id(app.documents.item(i)))
     OPEN_BEFORE_EXPORT.discard(None)
 
-    export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
-                  export_electronics)
+    export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
+                  folder_preserve, export_electronics)
 
     global EXPORT_CLEANUP_PENDING
     EXPORT_CLEANUP_PENDING = True
@@ -136,8 +152,8 @@ def show_export_summary():
         ui.messageBox(message)
 
 
-def export_folder(root_folder, output_folder, file_types, write_version, name_option, folder_preserve,
-                  export_electronics):
+def export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
+                  folder_preserve, export_electronics):
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
@@ -148,12 +164,15 @@ def export_folder(root_folder, output_folder, file_types, write_version, name_op
         else:
             new_folder = output_folder
 
-        export_folder(folder, new_folder, file_types, write_version, name_option, folder_preserve,
-                      export_electronics)
+        export_folder(folder, new_folder, file_types, drawing_types, write_version, name_option,
+                      folder_preserve, export_electronics)
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d":
             export_data_file(file, output_folder, file_types, write_version, name_option)
+
+        elif HAS_DRAWING and file.fileExtension == "f2d" and any_type_selected(drawing_types):
+            export_drawing_file(file, output_folder, drawing_types, write_version)
 
         elif HAS_ELECTRON and export_electronics and file.fileExtension in ELECTRONICS_EXTENSIONS:
             # Only open Fusion-native electronics documents (fsch/fbrd/flbr).
@@ -182,6 +201,56 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
 
     finally:
         close_doc(document)
+
+
+def export_drawing_file(data_file, output_folder, drawing_types, write_version):
+    """Open a drawing, export it to the selected types, and close it again."""
+    document = open_doc(data_file)
+
+    if document is None:
+        FAILED_FILES.append("{}: could not be opened".format(data_file.name))
+        return
+
+    try:
+        # Drawings don't have a description or part number, so always use the document name
+        output_name = get_document_name(write_version)
+        export_drawing_doc(document, output_folder, drawing_types, output_name)
+
+    except Exception as e:
+        FAILED_FILES.append("{}: {}".format(data_file.name, str(e)))
+
+    finally:
+        close_doc(document)
+
+
+def export_drawing_doc(document, folder, drawing_types, output_name):
+    """Export a drawing to each selected type. Each type produces one file containing every sheet.
+
+    A type that fails is recorded and the remaining types are still exported.
+    """
+    # A drawing isn't available through document.products, only through the drawing document
+    export_mgr = adsk.drawing.DrawingDocument.cast(document).drawing.exportManager
+
+    for type_name, (factory_name, extension) in DRAWING_EXPORTS.items():
+        if not is_type_selected(drawing_types, type_name):
+            continue
+
+        if not hasattr(export_mgr, factory_name):
+            FAILED_FILES.append("{}: {} export not available in this Fusion version".format(output_name, type_name))
+            continue
+
+        try:
+            export_name = dup_check(folder + output_name + extension)
+            export_options = getattr(export_mgr, factory_name)(export_name)
+
+            if type_name == 'PDF':
+                export_options.openPDF = False
+
+            if not export_mgr.execute(export_options):
+                FAILED_FILES.append("{}: {} export failed".format(output_name, type_name))
+
+        except Exception as e:
+            FAILED_FILES.append("{}: {} export error: {}".format(output_name, type_name, str(e)))
 
 
 def export_electronics_file(data_file, output_folder, write_version):
@@ -301,6 +370,11 @@ def finish_close_all():
         EXPORT_CLEANUP_PENDING = False
         OPEN_BEFORE_EXPORT.clear()
         show_export_summary()
+
+
+def any_type_selected(file_types):
+    """Return True if any export type is checked in the dropdown."""
+    return any(file_types.item(i).isSelected for i in range(file_types.count))
 
 
 def is_type_selected(file_types, type_name):
