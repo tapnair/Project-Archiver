@@ -203,6 +203,7 @@ def export_active_doc(folder, file_types, output_name):
 
     if is_type_selected(file_types, 'STL'):
         stl_export_name = folder + output_name + '.stl'
+        stl_export_name = dup_check(stl_export_name)
         stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
         export_mgr.execute(stl_options)
 

@@ -44,5 +44,5 @@ def dup_check(name: str) -> str:
         base, ext = os.path.splitext(name)
         base += '-dup'
         name = base + ext
-        dup_check(name)
+        name = dup_check(name)
     return name
