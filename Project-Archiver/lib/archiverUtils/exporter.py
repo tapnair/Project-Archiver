@@ -572,6 +572,10 @@ class HubExporter:
             self.results.declined = True
             return
 
+        # Fusion only closes the counting dialog once it gets control back. Without this, it stays on
+        # top of the confirmation and blocks its buttons.
+        adsk.doEvents()
+
         if not self.confirm(documents):
             self.results.declined = True
             return
@@ -605,6 +609,11 @@ class HubExporter:
         progress = ui.createProgressDialog()
         progress.isCancelButtonShown = True
         progress.show('Project Archiver', 'Counting documents in project %v of %m', 0, len(self.projects))
+
+        # Fusion opens the dialog asynchronously. If counting finishes before it has opened, hiding
+        # it does nothing and it stays open, so let Fusion open it first. Nothing is open for export
+        # yet, so letting Fusion process its events here is safe.
+        adsk.doEvents()
 
         def count(data_folder):
             return data_folder.dataFiles.count + sum(count(folder) for folder in data_folder.dataFolders)
