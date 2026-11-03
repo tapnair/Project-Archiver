@@ -953,8 +953,7 @@ def get_name(write_version, option):
     if not output_name:
         return get_document_name(write_version)
 
-    # Versions of a design would otherwise export to the same file name
-    if export_all_versions:
+    if write_version:
         output_name += ' v{}'.format(app.activeDocument.dataFile.versionNumber)
 
     return output_name

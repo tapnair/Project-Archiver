@@ -73,7 +73,6 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
 
     version_input = advanced_inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '',
                                                       False)
-    version_input.isVisible = False
 
     all_versions_input = advanced_inputs.addBoolValueInput('all_versions', 'Export all versions?', True, '', False)
     all_versions_input.tooltip = ('Export every version of each design and drawing, not only the latest. '
@@ -104,7 +103,6 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     text_commands_input.tooltip = ('Open the Text Commands window to see each file as it\'s exported. '
                                    'The same details are written to {} in the output folder.'.format(LOG_FILE_NAME))
 
-    update_name_inputs(inputs, 'Document name')
 
 
 def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolder = None):
@@ -155,9 +153,8 @@ def handle_input_changed(changed_input: adsk.core.CommandInput, inputs: adsk.cor
     # For an input inside a group, inputs only holds the group's inputs, so use the whole dialog's
     inputs = changed_input.parentCommand.commandInputs
 
-    if changed_input.id in ('name_option_id', 'all_versions'):
-        name_option_input: adsk.core.DropDownCommandInput = inputs.itemById('name_option_id')
-        update_name_inputs(inputs, name_option_input.selectedItem.name)
+    if changed_input.id == 'all_versions':
+        update_version_input(inputs)
 
     elif changed_input.id == 'browse_output_folder':
         output_folder_input: adsk.core.StringValueCommandInput = inputs.itemById('output_folder')
@@ -198,17 +195,12 @@ def browse_for_folder(current_folder: str) -> str:
     return ''
 
 
-def update_name_inputs(command_inputs: adsk.core.CommandInputs, selection: str):
-    """Show the write version option when naming files by document name or exporting all versions.
-
-    Exporting all versions always writes versions to the file names, so the option is turned on
-    and can't be changed.
-    """
+def update_version_input(command_inputs: adsk.core.CommandInputs):
+    """Exporting all versions always writes versions to the file names, so turn that option on
+    and don't let it be changed."""
     version_input: adsk.core.BoolValueCommandInput = command_inputs.itemById('write_version')
     all_versions_input: adsk.core.BoolValueCommandInput = command_inputs.itemById('all_versions')
-    all_versions = all_versions_input is not None and all_versions_input.value
 
-    version_input.isVisible = selection == 'Document name' or all_versions
-    version_input.isEnabled = not all_versions
-    if all_versions:
+    version_input.isEnabled = not all_versions_input.value
+    if all_versions_input.value:
         version_input.value = True
