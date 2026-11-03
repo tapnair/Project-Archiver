@@ -2,6 +2,7 @@
 #  :license: Apache2, see LICENSE for more details.
 
 import adsk.core
+import html
 import os
 from ...lib import fusionAddInUtils as futil
 from ...lib import archiverUtils
@@ -57,7 +58,8 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # The command exports the project selected in the Data Panel. In the rare case Fusion
     # can't provide one, open the Data Panel and don't show the dialog.
-    if archiverUtils.get_active_project() is None:
+    project = archiverUtils.get_active_project()
+    if project is None:
         app.data.isDataPanelVisible = True
         ui.messageBox('Fusion could not find an active project.\n\n'
                       'In the Data Panel, navigate to the project you want to archive, '
@@ -65,10 +67,16 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
         return
 
     archiverUtils.clear_export_messages()
-    default_dir = archiverUtils.get_default_dir(config.user_dir_name)
+
+    # Each project gets its own folder by default so archives of different projects don't mix
+    default_dir = os.path.join(archiverUtils.get_default_dir(config.user_dir_name),
+                               archiverUtils.sanitize_name(project.name), '')
 
     # https://help.autodesk.com/view/fusion360/ENU/?contextId=CommandInputs
     inputs = args.command.commandInputs
+
+    # Show which project will be archived, since that's whatever is selected in the Data Panel
+    inputs.addTextBoxCommandInput('project_name', 'Project:', html.escape(project.name), 1, True)
 
     inputs.addStringValueInput('output_folder', 'Output folder:', default_dir)
 
