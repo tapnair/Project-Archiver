@@ -16,7 +16,7 @@ from ... import config
 from . import exporter
 from .export_options import (DESIGN_EXTENSIONS, DRAWING_EXPORTS, EXISTING_FILES_OPTIONS, EXISTING_FILES_SKIP,
                              NAME_DOCUMENT, NAME_OPTIONS, ExportOptions)
-from .file_utils import get_default_dir, sanitize_name
+from .file_utils import get_home_folder, sanitize_name
 from .log_utils import LOG_FILE_NAME
 
 app = adsk.core.Application.get()
@@ -36,8 +36,8 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     inputs.addTextBoxCommandInput('export_location', location_label, html.escape(location), 1, True)
 
     # Each project gets its own folder by default so archives of different projects don't mix
-    default_dir = os.path.join(get_default_dir(config.USER_DIR_NAME), sanitize_name(project_name), '')
-    inputs.addStringValueInput('output_folder', 'Output folder:', default_dir)
+    default_folder = os.path.join(get_home_folder(config.USER_DIR_NAME), sanitize_name(project_name), '')
+    inputs.addStringValueInput('output_folder', 'Output folder:', default_folder)
 
     browse_input = inputs.addBoolValueInput('browse_output_folder', 'Browse', False, '', False)
     browse_input.text = 'Browse...'

@@ -20,7 +20,7 @@ DEBUG = False
 ADDIN_NAME = os.path.basename(os.path.dirname(__file__))
 COMPANY_NAME = 'Autodesk'
 
-# Name of the folder created in the user's home directory as the default export location
+# Folder in the user's home directory that each project exports to by default, in its own subfolder
 USER_DIR_NAME = 'ProjectArchiver'
 
 # Location of the Archive panel shared by all commands

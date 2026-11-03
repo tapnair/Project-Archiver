@@ -30,14 +30,9 @@ def sanitize_name(name: str) -> str:
     return name
 
 
-def get_default_dir(dir_name: str) -> str:
-    """Get a folder in the user's home directory, creating it if it does not exist."""
-    default_dir = os.path.join(os.path.expanduser('~'), dir_name, '')
-
-    if not os.path.exists(default_dir):
-        os.makedirs(default_dir)
-
-    return default_dir
+def get_home_folder(folder_name: str) -> str:
+    """Return the path of a folder in the user's home directory. The folder is created when exporting."""
+    return os.path.join(os.path.expanduser('~'), folder_name, '')
 
 
 def dup_check(path: str) -> str:
