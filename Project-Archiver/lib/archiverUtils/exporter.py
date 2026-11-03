@@ -312,6 +312,8 @@ class Exporter:
         """
         options = self.options
         design = document_utils.get_active_design()
+        if design is None:
+            raise RuntimeError("the document isn't a design")
         export_mgr = design.exportManager
         output_name = self.get_design_name(design)
 
