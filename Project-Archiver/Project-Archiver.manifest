@@ -1,13 +1,14 @@
 {
-	"autodeskProduct":	"Fusion360",
+	"autodeskProduct":	"Fusion",
 	"type":	"addin",
 	"id":	"31c84e41-5975-4127-90e6-f1bfa65eafe3",
 	"author":	"Patrick Rainsberry",
 	"description":	{
-		"":	"Export all files in a given project to STEP file or other types for archival purposes."
+		"":	"Archive the designs, drawings and electronics documents in Fusion projects, folders and hubs as STEP, F3D, PDF and other local files."
 	},
-	"version":	"2.1.0",
+	"version":	"3.0.0",
 	"runOnStartup":	false,
 	"supportedOS":	"windows|mac",
-	"editEnabled":	true
+	"editEnabled":	true,
+	"iconFilename":	"AddInIcon.svg"
 }

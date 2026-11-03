@@ -1,0 +1,53 @@
+#  Copyright (c) 2019-2026 Patrick Rainsberry
+#  Licensed under the Apache License, Version 2.0. See LICENSE for details.
+
+"""Helpers for local file and folder names and paths."""
+
+import os
+import re
+
+# Characters that are not allowed in file or folder names on Windows or macOS, plus control characters.
+# Names are sanitized the same way on every OS so an archive can be moved between them.
+ILLEGAL_NAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+# Device names that Windows does not allow as a file name, with or without an extension.
+WINDOWS_RESERVED_NAMES = {'CON', 'PRN', 'AUX', 'NUL'} | {f'COM{i}' for i in range(1, 10)} | {f'LPT{i}' for i in range(1, 10)}
+
+
+def sanitize_name(name: str) -> str:
+    """Make a Fusion document, component or folder name safe to use as a file or folder name.
+
+    Illegal characters are replaced with a dash, trailing spaces and periods are removed since
+    Windows drops them, and Windows reserved device names get a trailing dash.
+    """
+    name = ILLEGAL_NAME_CHARS.sub('-', name).strip().rstrip('. ')
+
+    # Windows checks the part before the first period, so add the dash there
+    base = name.split('.')[0]
+    if base.upper() in WINDOWS_RESERVED_NAMES:
+        name = base + '-' + name[len(base):]
+
+    return name
+
+
+def get_output_folder(root_folder: str, hub_name: str, project_name: str, folder_path=(), preserve_folders=True) -> str:
+    """Return where a project's files go: <root>/<hub>/<project>/, followed by its folders if preserve_folders.
+
+    Every export command uses this, so a design goes to the same place whichever command exports it.
+    """
+    names = [hub_name, project_name] + (list(folder_path) if preserve_folders else [])
+    return os.path.join(root_folder, *[sanitize_name(name) for name in names], '')
+
+
+def get_home_folder(folder_name: str) -> str:
+    """Return the path of a folder in the user's home directory. The folder is created when exporting."""
+    return os.path.join(os.path.expanduser('~'), folder_name, '')
+
+
+def dup_check(path: str) -> str:
+    """Return path, with -dup added before the extension as many times as needed to make it unused."""
+    base, ext = os.path.splitext(path)
+    while os.path.exists(path):
+        base += '-dup'
+        path = base + ext
+    return path
