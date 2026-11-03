@@ -513,7 +513,9 @@ def export_active_doc(folder, file_types, output_name):
 
     if is_type_selected(file_types, 'F3D'):
 
-        if document.allDocumentReferences.count > 0:
+        # The data file knows this even when the design was loaded in the background by an assembly,
+        # where document.allDocumentReferences raises an error
+        if document.dataFile.hasChildReferences:
             SKIPPED_FILES.append(document.name)
             log('Not exported as F3D: {} (has external references)'.format(get_project_path(document.dataFile)))
 
