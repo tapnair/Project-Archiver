@@ -244,7 +244,7 @@ class Exporter:
 
         # Whether a design is used by others is known without opening it
         if options.skip_used_designs and document_utils.is_used_by_other_designs(data_file):
-            self.results.used_designs_skipped.append(data_file.name)
+            self.results.used_designs_skipped.add(data_file.id)
             parents = [parent.name for parent in data_file.parentReferences if parent.fileExtension == 'f3d']
             log('Skipped: {} (used by {})'.format(self.project_path(data_file), ', '.join(parents)))
             return
@@ -321,7 +321,7 @@ class Exporter:
             # The data file knows this even when the design was loaded in the background by an
             # assembly, where document.allDocumentReferences raises an error.
             if document.dataFile.hasChildReferences:
-                self.results.f3d_skipped.append(document.name)
+                self.results.f3d_skipped.append(self.project_path(document.dataFile))
                 log('Not exported as F3D: {} (references other designs; use File > Export in Fusion to save an F3Z)'
                     .format(self.project_path(document.dataFile)))
             else:

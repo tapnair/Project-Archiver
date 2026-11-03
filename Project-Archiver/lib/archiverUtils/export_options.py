@@ -71,8 +71,8 @@ class ExportResults:
 
     exported_files: int = 0                                # files written
     existing_skipped: list = field(default_factory=list)   # paths that already existed
-    used_designs_skipped: list = field(default_factory=list)
-    f3d_skipped: list = field(default_factory=list)        # designs that reference other designs
+    used_designs_skipped: set = field(default_factory=set)  # data file ids, so versions count once
+    f3d_skipped: list = field(default_factory=list)        # project paths of designs that reference others
     failed: list = field(default_factory=list)             # "<file>: <reason>" lines
     cancelled: tuple = None                                 # (files done, files to export) if cancelled
     declined: bool = False                                  # the all-versions confirmation was declined
