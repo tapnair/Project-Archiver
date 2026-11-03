@@ -76,7 +76,7 @@ All the commands are in **Utilities > Archive** in the Design workspace. The exp
 
    ![The export dialog](images/export_dialog.png)
 
-4. A progress dialog shows each file as it's exported. Click **Cancel** to stop after the file in progress. Fusion is busy until the export finishes, so on a large project or hub, start it when you won't need Fusion for a while.
+4. A progress dialog shows each file as it's exported. Click **Cancel** to stop after the file in progress. If the progress dialog comes back after you click Cancel, click Cancel again: drawings and electronics documents switch Fusion's workspace, which closes the dialog, so a click during one of those files isn't counted. Fusion is busy until the export finishes, so on a large project or hub, start it when you won't need Fusion for a while.
 
    ![Export progress](images/export_progress.png)
 
