@@ -4,7 +4,7 @@
 	"id":	"31c84e41-5975-4127-90e6-f1bfa65eafe3",
 	"author":	"Patrick Rainsberry",
 	"description":	{
-		"":	"Archive the designs, drawings and electronics documents in a Fusion project or folder as STEP, F3D, PDF and other local files."
+		"":	"Archive the designs, drawings and electronics documents in Fusion projects, folders and hubs as STEP, F3D, PDF and other local files."
 	},
 	"version":	"3.0.0",
 	"runOnStartup":	false,
