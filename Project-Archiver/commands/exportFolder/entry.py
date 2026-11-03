@@ -78,7 +78,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # Show which folder will be archived, since that's whatever is open in the Data Panel
     folder_path = archiverUtils.get_folder_path(data_folder)
     location = '/'.join([project.name] + folder_path) if folder_path else f'{project.name} (project root)'
-    export_dialog.add_export_inputs(inputs, 'Folder:', location, project.name)
+    export_dialog.add_export_inputs(inputs, 'Folder:', location, project.parentHub.name, project.name, folder_path)
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)

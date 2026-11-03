@@ -16,7 +16,7 @@ from ... import config
 from . import exporter
 from .export_options import (DESIGN_EXTENSIONS, DRAWING_EXPORTS, EXISTING_FILES_OPTIONS, EXISTING_FILES_SKIP,
                              NAME_DOCUMENT, NAME_OPTIONS, ExportOptions)
-from .file_utils import get_home_folder, sanitize_name
+from .file_utils import get_home_folder, get_output_folder, sanitize_name
 from .log_utils import LOG_FILE_NAME
 
 app = adsk.core.Application.get()
@@ -26,22 +26,36 @@ ui = app.userInterface
 DEFAULT_DESIGN_TYPES = {'STEP'}
 DEFAULT_DRAWING_TYPES = {'PDF'}
 
+# Shown in the output path preview in place of the project name when exporting a hub
+PROJECT_NAME_PLACEHOLDER = '<project name>'
 
-def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, location: str, project_name: str):
+# The hub, project and folder the open dialog exports, for the output path preview
+preview_location = {}
+
+
+def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, location: str, hub_name: str,
+                      project_name: str = None, folder_path=()):
     """Add the export dialog's inputs.
 
     location_label and location describe what will be exported, such as the project name, and are
-    shown read-only at the top since they come from the Data Panel.
+    shown read-only at the top since they come from the Data Panel. hub_name, project_name and
+    folder_path are used to preview where the files go; project_name is None when exporting a hub.
     """
+    preview_location.clear()
+    preview_location.update(hub_name=hub_name, project_name=project_name, folder_path=list(folder_path))
+
     inputs.addTextBoxCommandInput('export_location', location_label, html.escape(location), 1, True)
 
-    # Each project gets its own folder by default so archives of different projects don't mix
-    default_folder = os.path.join(get_home_folder(config.USER_DIR_NAME), sanitize_name(project_name), '')
-    inputs.addStringValueInput('output_folder', 'Output folder:', default_folder)
+    # The output folder is a root: files go under <root>/<hub>/<project>/, whichever command exports them
+    inputs.addStringValueInput('output_folder', 'Output folder:', get_home_folder(config.USER_DIR_NAME))
 
     browse_input = inputs.addBoolValueInput('browse_output_folder', 'Browse', False, '', False)
     browse_input.text = 'Browse...'
     browse_input.tooltip = 'Choose the folder to export to'
+
+    # Shows the full path the files go to, updated as the output folder or folder structure option changes
+    preview_input = inputs.addTextBoxCommandInput('output_preview', '', '', 1, True)
+    preview_input.isFullWidth = True
 
     design_types_input = inputs.addDropDownCommandInput('design_types', 'Design export types',
                                                         adsk.core.DropDownStyles.CheckBoxDropDownStyle)
@@ -97,7 +111,9 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     text_commands_input = advanced_inputs.addBoolValueInput('open_text_commands', 'Open Text Commands?', True, '',
                                                             False)
     text_commands_input.tooltip = ('Open the Text Commands window to see each file as it\'s exported. '
-                                   'The same details are written to {} in the output folder.'.format(LOG_FILE_NAME))
+                                   'The same details are written to {} in each project\'s folder.'.format(LOG_FILE_NAME))
+
+    update_output_preview(inputs)
 
 
 def get_export_options(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolder = None) -> ExportOptions:
@@ -158,6 +174,25 @@ def handle_input_changed(changed_input: adsk.core.CommandInput):
         folder = browse_for_folder(output_folder_input.value)
         if folder:
             output_folder_input.value = os.path.join(folder, '')
+        update_output_preview(inputs)
+
+    elif changed_input.id in ('output_folder', 'preserve_folders'):
+        update_output_preview(inputs)
+
+
+def update_output_preview(inputs: adsk.core.CommandInputs):
+    """Show the full path the files will go to, below the output folder."""
+    location = preview_location
+    root = inputs.itemById('output_folder').value
+    preserve_folders = inputs.itemById('preserve_folders').value
+
+    if location['project_name'] is None:
+        path = os.path.join(get_output_folder(root, location['hub_name'], ''), PROJECT_NAME_PLACEHOLDER, '')
+    else:
+        path = get_output_folder(root, location['hub_name'], location['project_name'], location['folder_path'],
+                                 preserve_folders)
+
+    inputs.itemById('output_preview').formattedText = '<i>Files go to: {}</i>'.format(html.escape(path))
 
 
 def inputs_are_valid(inputs: adsk.core.CommandInputs) -> bool:

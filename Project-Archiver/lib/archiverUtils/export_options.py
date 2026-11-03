@@ -49,7 +49,7 @@ EXPORTED_FILE_EXTENSIONS = {DESIGN_FILE_EXTENSION, DRAWING_FILE_EXTENSION} | set
 class ExportOptions:
     """Everything chosen in the export dialog."""
 
-    output_folder: str
+    output_folder: str     # root folder; files go to <root>/<hub>/<project>/...
     design_types: list = field(default_factory=list)    # names from DESIGN_EXTENSIONS, such as 'STEP'
     drawing_types: list = field(default_factory=list)   # names from DRAWING_EXPORTS, such as 'PDF'
     export_electronics: bool = True
@@ -61,7 +61,10 @@ class ExportOptions:
     include_hidden: bool = False
     all_versions: bool = False
 
-    # The Data Panel folder to export, or None for the whole active project
+    # The project to export, or None for the active project
+    project: adsk.core.DataProject = None
+
+    # The folder in the project to export, or None for the whole project
     data_folder: adsk.core.DataFolder = None
 
 

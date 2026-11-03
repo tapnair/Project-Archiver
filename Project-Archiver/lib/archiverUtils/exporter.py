@@ -39,7 +39,7 @@ from .export_options import (DESIGN_EXTENSIONS, DESIGN_FILE_EXTENSION, DRAWING_E
                              ELECTRONICS_EXPORTS, EXISTING_FILES_OVERWRITE, EXISTING_FILES_SKIP,
                              EXPORTED_FILE_EXTENSIONS, NAME_DESCRIPTION, NAME_DOCUMENT, NAME_PART_NUMBER,
                              ExportOptions, ExportResults)
-from .file_utils import dup_check, sanitize_name
+from .file_utils import dup_check, get_output_folder, sanitize_name
 from .log_utils import LOG_FILE_NAME, end_log, log, start_log
 
 app = adsk.core.Application.get()
@@ -98,9 +98,9 @@ class Exporter:
     # ----------------------------------------------------------------------------------------
 
     def run(self):
-        """Export every document in the active project, or in options.data_folder and its subfolders."""
+        """Export every document in a project, or in options.data_folder and its subfolders."""
         options = self.options
-        project = document_utils.get_active_project()
+        project = options.project or document_utils.get_active_project()
         root_folder = options.data_folder or project.rootFolder
         folder_path = document_utils.get_folder_path(root_folder)
 
@@ -108,17 +108,19 @@ class Exporter:
         if options.all_versions:
             options.write_version = True
 
-        # A folder's files go under its path in the project, where a whole-project export would put
-        # them, so folder-by-folder exports build up the same archive. The log stays at the top.
-        self.log_folder = os.path.join(options.output_folder, '')
-        output_folder = self.log_folder
-        if options.preserve_folders and folder_path:
-            output_folder = os.path.join(self.log_folder, *[sanitize_name(name) for name in folder_path], '')
+        # Files go under <root>/<hub>/<project>/, and a folder's files under its path in the project,
+        # where a whole-project export would put them. So every command builds up the same archive.
+        # Each project's log is in its project folder.
+        hub_name = project.parentHub.name
+        self.log_folder = get_output_folder(options.output_folder, hub_name, project.name)
+        output_folder = get_output_folder(options.output_folder, hub_name, project.name, folder_path,
+                                          options.preserve_folders)
         os.makedirs(output_folder, exist_ok=True)
 
         self.open_before_export = frozenset(document_utils.get_open_version_ids())
 
         start_log(self.log_folder, [
+            'Hub: {}'.format(hub_name),
             'Project: {}'.format(project.name),
             'Folder: {}'.format('/'.join(folder_path) if folder_path else 'whole project'),
             'Output folder: {}'.format(output_folder),

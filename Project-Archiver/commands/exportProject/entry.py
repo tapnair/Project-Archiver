@@ -70,7 +70,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     inputs = args.command.commandInputs
 
     # Show which project will be archived, since that's whatever is selected in the Data Panel
-    export_dialog.add_export_inputs(inputs, 'Project:', project.name, project.name)
+    export_dialog.add_export_inputs(inputs, 'Project:', project.name, project.parentHub.name, project.name)
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)

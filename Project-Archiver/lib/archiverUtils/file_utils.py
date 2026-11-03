@@ -30,6 +30,15 @@ def sanitize_name(name: str) -> str:
     return name
 
 
+def get_output_folder(root_folder: str, hub_name: str, project_name: str, folder_path=(), preserve_folders=True) -> str:
+    """Return where a project's files go: <root>/<hub>/<project>/, followed by its folders if preserve_folders.
+
+    Every export command uses this, so a design goes to the same place whichever command exports it.
+    """
+    names = [hub_name, project_name] + (list(folder_path) if preserve_folders else [])
+    return os.path.join(root_folder, *[sanitize_name(name) for name in names], '')
+
+
 def get_home_folder(folder_name: str) -> str:
     """Return the path of a folder in the user's home directory. The folder is created when exporting."""
     return os.path.join(os.path.expanduser('~'), folder_name, '')
