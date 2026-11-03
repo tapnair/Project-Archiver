@@ -139,6 +139,11 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     skip_used_input.tooltip = ('Only export designs that aren\'t inserted into another design, '
                                'such as top-level assemblies')
 
+    hidden_input = advanced_inputs.addBoolValueInput('include_hidden', 'Include hidden bodies and components?', True,
+                                                     '', False)
+    hidden_input.tooltip = ('Show every hidden body and component at every level before exporting, so they\'re '
+                            'included. F3D files always include them, hidden as in the design.')
+
     text_commands_input = advanced_inputs.addBoolValueInput('open_text_commands', 'Open Text Commands?', True, '',
                                                             False)
     text_commands_input.tooltip = ('Open the Text Commands window to see each file as it\'s exported. '
@@ -170,6 +175,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     existing_files_input: adsk.core.DropDownCommandInput = inputs.itemById('existing_files')
     skip_used_input: adsk.core.BoolValueCommandInput = inputs.itemById('skip_used_designs')
     text_commands_input: adsk.core.BoolValueCommandInput = inputs.itemById('open_text_commands')
+    hidden_input: adsk.core.BoolValueCommandInput = inputs.itemById('include_hidden')
 
     if text_commands_input.value:
         text_commands = ui.palettes.itemById('TextCommands')
@@ -185,7 +191,8 @@ def command_execute(args: adsk.core.CommandEventArgs):
         preserve_input.value,
         electronics_input.value,
         existing_files_input.selectedItem.name,
-        skip_used_input.value
+        skip_used_input.value,
+        hidden_input.value
     )
 
     # Close the documents that were opened for export. Close All shows the export summary when it finishes.

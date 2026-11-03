@@ -55,6 +55,9 @@ existing_files = EXISTING_FILES_RENAME
 # When True, designs inserted into other designs aren't exported on their own
 skip_used_designs = False
 
+# When True, hidden bodies and components are shown before exporting to formats other than F3D
+include_hidden = False
+
 # True from the end of an export until Close All has finished cleaning up after it
 EXPORT_CLEANUP_PENDING = False
 
@@ -114,7 +117,8 @@ def clear_export_messages():
 
 
 def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
-                   export_electronics, existing_files_option=EXISTING_FILES_RENAME, skip_used_designs_option=False):
+                   export_electronics, existing_files_option=EXISTING_FILES_RENAME, skip_used_designs_option=False,
+                   include_hidden_option=False):
     """Export every document in the active project.
 
     Files that could not be exported are collected and reported by show_export_summary
@@ -122,9 +126,10 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
     """
     root_folder = get_active_project().rootFolder
 
-    global existing_files, skip_used_designs
+    global existing_files, skip_used_designs, include_hidden
     existing_files = existing_files_option
     skip_used_designs = skip_used_designs_option
+    include_hidden = include_hidden_option
 
     # Make sure we have a folder not a file
     if not output_folder.endswith(os.path.sep):
@@ -149,6 +154,7 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
         'Preserve folder structure: {}'.format('yes' if folder_preserve else 'no'),
         'Existing files: {}'.format(existing_files),
         'Skip designs used by other designs: {}'.format('yes' if skip_used_designs else 'no'),
+        'Include hidden bodies and components: {}'.format('yes' if include_hidden else 'no'),
     ])
 
     export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
@@ -494,25 +500,15 @@ def is_type_selected(file_types, type_name):
 
 
 def export_active_doc(folder, file_types, output_name):
+    """Export the active design to each selected design type.
+
+    F3D is exported first, as the design is. When include_hidden is set, hidden bodies and
+    components are then shown for the other types, and hidden again afterward if the user
+    already had the design open.
+    """
     document = app.activeDocument
     design = get_active_design()
     export_mgr = design.exportManager
-
-    # Simple solid-body export types, keyed by the dropdown item name.
-    solid_export_functions = {
-        'IGES': (export_mgr.createIGESExportOptions, '.igs'),
-        'STEP': (export_mgr.createSTEPExportOptions, '.step'),
-        'SAT': (export_mgr.createSATExportOptions, '.sat'),
-        'SMT': (export_mgr.createSMTExportOptions, '.smt'),
-    }
-
-    for type_name, (export_function, extension) in solid_export_functions.items():
-        if is_type_selected(file_types, type_name):
-            export_name = get_export_path(folder + output_name + extension)
-            if export_name is None:
-                continue
-            export_options = export_function(export_name)
-            export_mgr.execute(export_options)
 
     if is_type_selected(file_types, 'F3D'):
 
@@ -529,11 +525,84 @@ def export_active_doc(folder, file_types, output_name):
                 export_options = export_mgr.createFusionArchiveExportOptions(export_name)
                 export_mgr.execute(export_options)
 
-    if is_type_selected(file_types, 'STL'):
-        stl_export_name = get_export_path(folder + output_name + '.stl')
-        if stl_export_name is not None:
-            stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
-            export_mgr.execute(stl_options)
+    # Simple solid-body export types, keyed by the dropdown item name.
+    solid_export_functions = {
+        'IGES': (export_mgr.createIGESExportOptions, '.igs'),
+        'STEP': (export_mgr.createSTEPExportOptions, '.step'),
+        'SAT': (export_mgr.createSATExportOptions, '.sat'),
+        'SMT': (export_mgr.createSMTExportOptions, '.smt'),
+    }
+    other_types = [type_name for type_name in list(solid_export_functions) + ['STL']
+                   if is_type_selected(file_types, type_name)]
+    if not other_types:
+        return
+
+    shown = show_hidden_geometry(design) if include_hidden else []
+    if shown:
+        log('Showed {} hidden bodies and components in {}'.format(len(shown), get_project_path(document.dataFile)))
+
+    try:
+        for type_name, (export_function, extension) in solid_export_functions.items():
+            if type_name in other_types:
+                export_name = get_export_path(folder + output_name + extension)
+                if export_name is None:
+                    continue
+                export_options = export_function(export_name)
+                export_mgr.execute(export_options)
+
+        if 'STL' in other_types:
+            stl_export_name = get_export_path(folder + output_name + '.stl')
+            if stl_export_name is not None:
+                stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
+                export_mgr.execute(stl_options)
+
+    finally:
+        # Exported documents are closed without saving, but one the user already had open stays open
+        if shown and get_data_file_id(document) in OPEN_BEFORE_EXPORT:
+            hide_again(shown)
+
+
+def show_hidden_geometry(design):
+    """Show every hidden body and component at every level of a design.
+
+    Turns on the bodies and Bodies folder of the root component and of every component
+    occurrence, and the occurrences themselves, so nothing is left out of the export.
+    Returns what was turned on, so it can be hidden again.
+    """
+    shown = []
+
+    def turn_on(entity, light_bulb):
+        try:
+            if not getattr(entity, light_bulb):
+                setattr(entity, light_bulb, True)
+                shown.append((entity, light_bulb))
+        except RuntimeError:
+            # Some entities can't be changed, such as bodies in a referenced component
+            pass
+
+    root = design.rootComponent
+    turn_on(root, 'isBodiesFolderLightBulbOn')
+    for body in root.bRepBodies:
+        turn_on(body, 'isLightBulbOn')
+
+    for occurrence in root.allOccurrences:
+        turn_on(occurrence, 'isLightBulbOn')
+        turn_on(occurrence.component, 'isBodiesFolderLightBulbOn')
+
+        # The occurrence's bodies are proxies, so this shows them in this occurrence of the component
+        for body in occurrence.bRepBodies:
+            turn_on(body, 'isLightBulbOn')
+
+    return shown
+
+
+def hide_again(shown):
+    """Hide what show_hidden_geometry turned on."""
+    for entity, light_bulb in reversed(shown):
+        try:
+            setattr(entity, light_bulb, False)
+        except RuntimeError:
+            pass
 
 
 def _export_one_electronics_format(product, type_name, folder, output_name):
