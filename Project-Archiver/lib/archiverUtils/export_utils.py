@@ -168,7 +168,7 @@ def export_folder(root_folder, output_folder, file_types, drawing_types, write_v
                       folder_preserve, export_electronics)
 
     for file in root_folder.dataFiles:
-        if file.fileExtension == "f3d":
+        if file.fileExtension == "f3d" and any_type_selected(file_types):
             export_data_file(file, output_folder, file_types, write_version, name_option)
 
         elif HAS_DRAWING and file.fileExtension == "f2d" and any_type_selected(drawing_types):
