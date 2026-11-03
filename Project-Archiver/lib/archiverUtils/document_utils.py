@@ -20,6 +20,14 @@ import adsk.fusion
 app = adsk.core.Application.get()
 
 
+def get_active_hub():
+    """Return the hub open in the Data Panel, or None if Fusion can't provide one."""
+    try:
+        return app.data.activeHub
+    except RuntimeError:
+        return None
+
+
 def get_active_project():
     """Return the project selected in the Data Panel, or None if Fusion can't provide one.
 

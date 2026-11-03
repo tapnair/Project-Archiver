@@ -4,12 +4,14 @@
 # You need to use aliases (import "entry" as "my_module") assuming you have the default module named "entry".
 from .exportProject import entry as exportProject
 from .exportFolder import entry as exportFolder
+from .exportHub import entry as exportHub
 from .closeAll import entry as closeAll
 
 # Fusion will automatically call the start() and stop() functions.
 commands = [
     exportProject,
     exportFolder,
+    exportHub,
     closeAll
 ]
 

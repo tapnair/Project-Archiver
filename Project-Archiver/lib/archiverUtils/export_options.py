@@ -78,4 +78,5 @@ class ExportResults:
     f3d_skipped: list = field(default_factory=list)        # project paths of designs that reference others
     failed: list = field(default_factory=list)             # "<file>: <reason>" lines
     cancelled: tuple = None                                 # (files done, files to export) if cancelled
+    cancelled_project: str = None                           # the project a hub export was cancelled in
     declined: bool = False                                  # the all-versions confirmation was declined

@@ -14,8 +14,10 @@ An export runs in these steps:
    while exported documents are still open can fail, which is why the summary waits for this.
 """
 
+import dataclasses
 import os
 import re
+import time
 
 import adsk.core
 import adsk.fusion
@@ -53,9 +55,16 @@ MAX_LISTED_IN_SUMMARY = 15
 
 
 def export(options: ExportOptions):
-    """Export with the given options. Close all documents finishes it by calling finish_export."""
+    """Export a project or folder. Close all documents finishes it by calling finish_export."""
     global pending_export
     pending_export = Exporter(options)
+    pending_export.run()
+
+
+def export_hub(options: ExportOptions, projects):
+    """Export several projects of a hub. Close all documents finishes it by calling finish_export."""
+    global pending_export
+    pending_export = HubExporter(options, projects)
     pending_export.run()
 
 
@@ -76,12 +85,17 @@ def finish_export():
 class Exporter:
     """Exports a project or folder with one set of options, and collects the results."""
 
-    def __init__(self, options: ExportOptions):
+    def __init__(self, options: ExportOptions, open_before_export=None, progress_label='', confirmed=False):
+        """open_before_export, progress_label and confirmed are set when exporting one project of a hub:
+        the documents the user had open before the hub export, the progress dialog's label for the
+        project, and whether the user has already confirmed the export."""
         self.options = options
         self.results = ExportResults()
+        self.progress_label = progress_label
+        self.confirmed = confirmed
 
         # Version ids of the documents the user already had open, which are left open
-        self.open_before_export = frozenset()
+        self.open_before_export = open_before_export
 
         # Paths written for the file currently being exported, for the log
         self.current_exports = []
@@ -117,7 +131,8 @@ class Exporter:
                                           options.preserve_folders)
         os.makedirs(output_folder, exist_ok=True)
 
-        self.open_before_export = frozenset(document_utils.get_open_version_ids())
+        if self.open_before_export is None:
+            self.open_before_export = frozenset(document_utils.get_open_version_ids())
 
         start_log(self.log_folder, [
             'Hub: {}'.format(hub_name),
@@ -137,7 +152,7 @@ class Exporter:
 
         exports = self.collect_exports(root_folder, output_folder)
         if exports:
-            if options.all_versions and not self.confirm_all_versions(exports):
+            if options.all_versions and not self.confirmed and not self.confirm_all_versions(exports):
                 self.results.declined = True
                 log('Cancelled before exporting: {} versions to export'.format(len(exports)))
             else:
@@ -228,7 +243,7 @@ class Exporter:
                     progress.hide()
                     progress = show_progress(len(exports), index)
 
-                progress.message = 'Exporting %v of %m: {}'.format(self.project_path(data_file))
+                progress.message = '{}Exporting %v of %m: {}'.format(self.progress_label, self.project_path(data_file))
                 progress.progressValue = index
 
                 workspace = ui.activeWorkspace.id
@@ -532,46 +547,166 @@ class Exporter:
             self.current_exports.remove(export_path)
 
     def get_summary_messages(self, max_listed=None):
-        """Return the paragraphs that summarize the export, starting with how many files were written.
-
-        Lists of files are cut to max_listed entries for the message box; the log gets every entry.
-        """
-        results = self.results
-        messages = ['Exported {} to {}'.format(plural(results.exported_files, 'file'), self.log_folder)]
-
-        if results.declined:
-            messages.append('The export was cancelled before any files were exported.')
-
-        if results.cancelled:
-            messages.append('The export was cancelled after {} of {} files. Run it again with Existing files set to '
-                            'Skip existing files to continue where it stopped.'.format(*results.cancelled))
-
-        if results.used_designs_skipped:
-            messages.append('Skipped {} used by other designs.'.format(
-                plural(len(results.used_designs_skipped), 'design')))
-
-        if results.existing_skipped:
-            messages.append('Skipped {} that already existed in the output folder.'.format(
-                plural(len(results.existing_skipped), 'file')))
-
-        if results.f3d_skipped:
-            messages.append(
-                "These designs reference other designs, so they weren't exported as F3D:\n{}\n"
-                "An F3D of a design like this only links to the referenced designs and can't be opened on its own. "
-                "The other export types were still exported, and each referenced design gets its own F3D. "
-                "To keep a design with everything it references, open it and use File > Export to save an F3Z.".format(
-                    list_lines(results.f3d_skipped, max_listed)))
-
-        if results.failed:
-            messages.append('These files could not be exported:\n{}'.format(list_lines(results.failed, max_listed)))
-
-        return messages
+        return get_summary_messages(self.results, self.log_folder, max_listed)
 
     def show_summary(self):
-        """Show the summary in one message box, once the exported documents have been closed."""
-        messages = self.get_summary_messages(MAX_LISTED_IN_SUMMARY)
-        messages.append('Details for every file are in {} in the output folder.'.format(LOG_FILE_NAME))
-        ui.messageBox('\n\n'.join(messages), 'Project Archiver')
+        show_summary(self.results, self.log_folder)
+
+
+class HubExporter:
+    """Exports the selected projects of a hub, one project at a time, with one summary at the end."""
+
+    def __init__(self, options: ExportOptions, projects):
+        self.options = options
+        self.projects = list(projects)
+        self.hub_name = self.projects[0].parentHub.name if self.projects else ''
+        self.results = ExportResults()
+        self.open_before_export = frozenset()
+        self.log_folder = get_output_folder(options.output_folder, self.hub_name, '')
+        self.project_results = []  # (project name, ExportResults) for the hub log
+
+    def run(self):
+        """Estimate and confirm, then export each project with its own Exporter."""
+        documents = self.count_documents()
+        if documents is None:
+            self.results.declined = True
+            return
+
+        if not self.confirm(documents):
+            self.results.declined = True
+            return
+
+        # Recorded once, so designs still loaded in the background from one project aren't
+        # mistaken for documents the user had open when the next project starts
+        self.open_before_export = frozenset(document_utils.get_open_version_ids())
+
+        for index, project in enumerate(self.projects):
+            options = dataclasses.replace(self.options, project=project, data_folder=None)
+            exporter = Exporter(options, self.open_before_export,
+                                progress_label='Project {} of {}: {}\n'.format(index + 1, len(self.projects),
+                                                                              project.name),
+                                confirmed=True)
+            exporter.run()
+            self.add_results(project.name, exporter.results)
+
+            if exporter.results.cancelled:
+                self.results.cancelled = exporter.results.cancelled
+                self.results.cancelled_project = project.name
+                break
+
+        self.write_hub_log()
+
+    def count_documents(self):
+        """Estimate the documents to export by counting the files in each project's folders.
+
+        This doesn't check file types or versions, which would take much longer on a large hub.
+        Returns None if the user cancels while counting.
+        """
+        progress = ui.createProgressDialog()
+        progress.isCancelButtonShown = True
+        progress.show('Project Archiver', 'Counting documents in project %v of %m', 0, len(self.projects))
+
+        def count(data_folder):
+            return data_folder.dataFiles.count + sum(count(folder) for folder in data_folder.dataFolders)
+
+        try:
+            documents = 0
+            for index, project in enumerate(self.projects):
+                if progress.wasCancelled:
+                    return None
+                progress.progressValue = index
+                documents += count(project.rootFolder)
+            return documents
+
+        finally:
+            progress.hide()
+
+    def confirm(self, documents):
+        """Ask the user to confirm exporting the hub, with the number of projects and documents."""
+        versions = ', plus their older versions,' if self.options.all_versions else ''
+        result = ui.messageBox(
+            'This will export {} from {}, with about {}{}.\n\n'
+            'Exporting a whole hub can take a long time. Continue?'.format(
+                plural(len(self.projects), 'project'), self.hub_name, plural(documents, 'document'), versions),
+            'Export active hub',
+            adsk.core.MessageBoxButtonTypes.YesNoButtonType,
+            adsk.core.MessageBoxIconTypes.QuestionIconType
+        )
+        return result == adsk.core.DialogResults.DialogYes
+
+    def add_results(self, project_name, results):
+        """Add one project's results to the hub's, with the project name on each file."""
+        self.project_results.append((project_name, results))
+        hub_results = self.results
+        hub_results.exported_files += results.exported_files
+        hub_results.existing_skipped += results.existing_skipped
+        hub_results.used_designs_skipped |= results.used_designs_skipped
+        hub_results.f3d_skipped += ['{}/{}'.format(project_name, path) for path in results.f3d_skipped]
+        hub_results.failed += ['{}: {}'.format(project_name, failure) for failure in results.failed]
+
+    def write_hub_log(self):
+        """Write a short log in the hub folder listing each project's results."""
+        os.makedirs(self.log_folder, exist_ok=True)
+        lines = ['', '=' * 60,
+                 'Project Archiver hub export finished {}'.format(time.strftime('%Y-%m-%d %H:%M:%S')),
+                 'Hub: {}'.format(self.hub_name), '=' * 60]
+        for project_name, results in self.project_results:
+            lines.append('{}: {} exported, {} skipped as existing, {} failed{}'.format(
+                project_name, results.exported_files, len(results.existing_skipped), len(results.failed),
+                ', cancelled' if results.cancelled else ''))
+        not_exported = len(self.projects) - len(self.project_results)
+        if not_exported:
+            lines.append('{} not exported because the export was cancelled'.format(plural(not_exported, 'project')))
+        lines.append('Details for each project are in {} in its folder.'.format(LOG_FILE_NAME))
+
+        with open(os.path.join(self.log_folder, LOG_FILE_NAME), 'a', encoding='utf-8') as log_file:
+            log_file.write('\n'.join(lines) + '\n')
+
+    def show_summary(self):
+        show_summary(self.results, self.log_folder)
+
+
+def get_summary_messages(results: ExportResults, output_folder, max_listed=None):
+    """Return the paragraphs that summarize an export, starting with how many files were written.
+
+    Lists of files are cut to max_listed entries for the message box; the log gets every entry.
+    """
+    messages = ['Exported {} to {}'.format(plural(results.exported_files, 'file'), output_folder)]
+
+    if results.declined:
+        messages.append('The export was cancelled before any files were exported.')
+
+    if results.cancelled:
+        where = 'in project {}, '.format(results.cancelled_project) if results.cancelled_project else ''
+        messages.append('The export was cancelled {}after {} of {} files. Run it again with Existing files set to '
+                        'Skip existing files to continue where it stopped.'.format(where, *results.cancelled))
+
+    if results.used_designs_skipped:
+        messages.append('Skipped {} used by other designs.'.format(plural(len(results.used_designs_skipped), 'design')))
+
+    if results.existing_skipped:
+        messages.append('Skipped {} that already existed in the output folder.'.format(
+            plural(len(results.existing_skipped), 'file')))
+
+    if results.f3d_skipped:
+        messages.append(
+            "These designs reference other designs, so they weren't exported as F3D:\n{}\n"
+            "An F3D of a design like this only links to the referenced designs and can't be opened on its own. "
+            "The other export types were still exported, and each referenced design gets its own F3D. "
+            "To keep a design with everything it references, open it and use File > Export to save an F3Z.".format(
+                list_lines(results.f3d_skipped, max_listed)))
+
+    if results.failed:
+        messages.append('These files could not be exported:\n{}'.format(list_lines(results.failed, max_listed)))
+
+    return messages
+
+
+def show_summary(results: ExportResults, output_folder):
+    """Show the summary in one message box, once the exported documents have been closed."""
+    messages = get_summary_messages(results, output_folder, MAX_LISTED_IN_SUMMARY)
+    messages.append('Details for every file are in {} in each project\'s folder.'.format(LOG_FILE_NAME))
+    ui.messageBox('\n\n'.join(messages), 'Project Archiver')
 
 
 def show_progress(total, value):

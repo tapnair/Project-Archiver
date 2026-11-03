@@ -29,22 +29,29 @@ DEFAULT_DRAWING_TYPES = {'PDF'}
 # Shown in the output path preview in place of the project name when exporting a hub
 PROJECT_NAME_PLACEHOLDER = '<project name>'
 
+# Rows shown in the hub export's projects table before it scrolls
+PROJECT_ROWS_SHOWN = 10
+
 # The hub, project and folder the open dialog exports, for the output path preview
 preview_location = {}
 
 
 def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, location: str, hub_name: str,
-                      project_name: str = None, folder_path=()):
+                      project_name: str = None, folder_path=(), projects=None):
     """Add the export dialog's inputs.
 
     location_label and location describe what will be exported, such as the project name, and are
     shown read-only at the top since they come from the Data Panel. hub_name, project_name and
-    folder_path are used to preview where the files go; project_name is None when exporting a hub.
+    folder_path are used to preview where the files go. When exporting a hub, project_name is None
+    and projects is the hub's projects, offered in a dropdown with all of them checked.
     """
     preview_location.clear()
     preview_location.update(hub_name=hub_name, project_name=project_name, folder_path=list(folder_path))
 
     inputs.addTextBoxCommandInput('export_location', location_label, html.escape(location), 1, True)
+
+    if projects is not None:
+        add_projects_table(inputs, projects)
 
     # The output folder is a root: files go under <root>/<hub>/<project>/, whichever command exports them
     inputs.addStringValueInput('output_folder', 'Output folder:', get_home_folder(config.USER_DIR_NAME))
@@ -116,6 +123,51 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     update_output_preview(inputs)
 
 
+def add_projects_table(inputs: adsk.core.CommandInputs, projects):
+    """Add how many projects are selected, and a collapsed group with a table to choose them.
+
+    The table has a check box for each project, all checked, and Select all and Select none
+    buttons. A table scrolls when it has more rows than it shows, which a check box dropdown
+    doesn't, so a hub with many projects still fits in the dialog.
+    """
+    inputs.addTextBoxCommandInput('projects_selected', 'Projects:', '', 1, True)
+
+    group = inputs.addGroupCommandInput('project_selection', 'Select projects')
+    group.isExpanded = False
+
+    table = group.children.addTableCommandInput('projects', 'Projects', 2, '1:8')
+    table.maximumVisibleRows = PROJECT_ROWS_SHOWN
+    table.tooltip = 'The projects to export. All the hub\'s projects are checked to start with.'
+    table_inputs = table.commandInputs
+
+    for row, project in enumerate(projects):
+        check_box = table_inputs.addBoolValueInput('project_{}'.format(row), '', True, '', True)
+        name = table_inputs.addTextBoxCommandInput('project_name_{}'.format(row), '', html.escape(project.name), 1,
+                                                   True)
+        table.addCommandInput(check_box, row, 0)
+        table.addCommandInput(name, row, 1)
+
+    for button_id, text in (('select_all_projects', 'Select all'), ('select_no_projects', 'Select none')):
+        button = table_inputs.addBoolValueInput(button_id, text, False, '', False)
+        button.text = text
+        table.addToolbarCommandInput(button)
+
+    update_projects_selected(inputs)
+
+
+def get_selected_project_rows(inputs: adsk.core.CommandInputs):
+    """Return the row numbers of the projects checked in the projects table."""
+    table: adsk.core.TableCommandInput = inputs.itemById('projects')
+    return [row for row in range(table.rowCount) if inputs.itemById('project_{}'.format(row)).value]
+
+
+def update_projects_selected(inputs: adsk.core.CommandInputs):
+    """Show how many projects are checked."""
+    table: adsk.core.TableCommandInput = inputs.itemById('projects')
+    inputs.itemById('projects_selected').text = '{} of {} selected'.format(
+        len(get_selected_project_rows(inputs)), table.rowCount)
+
+
 def get_export_options(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolder = None) -> ExportOptions:
     """Read the dialog's inputs into ExportOptions."""
     def value(input_id):
@@ -161,6 +213,23 @@ def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolde
     close_command.execute()
 
 
+def run_hub_export(inputs: adsk.core.CommandInputs, projects):
+    """Export the projects checked in the dialog, then close the documents that were opened for export.
+
+    projects is the list the Projects dropdown was built from, in the same order.
+    """
+    if inputs.itemById('open_text_commands').value:
+        text_commands = ui.palettes.itemById('TextCommands')
+        if text_commands:
+            text_commands.isVisible = True
+
+    selected_projects = [projects[row] for row in get_selected_project_rows(inputs)]
+    exporter.export_hub(get_export_options(inputs), selected_projects)
+
+    close_command = ui.commandDefinitions.itemById(config.CLOSE_ALL_CMD_ID)
+    close_command.execute()
+
+
 def handle_input_changed(changed_input: adsk.core.CommandInput):
     """Update the dialog when one of its inputs changes."""
     # For an input inside a group, the event's inputs only hold the group's inputs, so use the whole dialog's
@@ -178,6 +247,15 @@ def handle_input_changed(changed_input: adsk.core.CommandInput):
 
     elif changed_input.id in ('output_folder', 'preserve_folders'):
         update_output_preview(inputs)
+
+    elif changed_input.id in ('select_all_projects', 'select_no_projects'):
+        table: adsk.core.TableCommandInput = inputs.itemById('projects')
+        for row in range(table.rowCount):
+            inputs.itemById('project_{}'.format(row)).value = changed_input.id == 'select_all_projects'
+        update_projects_selected(inputs)
+
+    elif changed_input.id.startswith('project_'):
+        update_projects_selected(inputs)
 
 
 def update_output_preview(inputs: adsk.core.CommandInputs):
@@ -197,6 +275,9 @@ def update_output_preview(inputs: adsk.core.CommandInputs):
 
 def inputs_are_valid(inputs: adsk.core.CommandInputs) -> bool:
     """Return True if there is something to export, which enables the OK button."""
+    if inputs.itemById('projects') is not None and not get_selected_project_rows(inputs):
+        return False
+
     options = get_export_options(inputs)
     return bool(options.design_types or options.drawing_types
                 or (exporter.HAS_ELECTRON and options.export_electronics))
