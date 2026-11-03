@@ -1,5 +1,5 @@
-#  Copyright (c) 2020 by Patrick Rainsberry.
-#  :license: Apache2, see LICENSE for more details.
+#  Copyright (c) 2019-2026 Patrick Rainsberry
+#  Licensed under the Apache License, Version 2.0. See LICENSE for details.
 
 import adsk.core
 import os

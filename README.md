@@ -74,7 +74,7 @@ This add-in is built on the standard Fusion Python add-in template and has no ex
 See [Python Add-in Template](https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-DF32F126-366B-45C0-88B0-CEB46F5A9BE8) for details on the add-in structure.
 
 ## License
-Licensed under the terms of the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please see the [LICENSE](LICENSE) file for full details.
+Copyright (c) 2019-2026 Patrick Rainsberry. Licensed under the terms of the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please see the [LICENSE](LICENSE) file for full details.
 
 ## Written by
 
