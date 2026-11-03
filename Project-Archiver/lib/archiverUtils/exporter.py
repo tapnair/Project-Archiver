@@ -536,7 +536,7 @@ class Exporter:
 
     def record_failure(self, data_file, reason):
         """Record a file that couldn't be exported, for the summary and the log."""
-        self.results.failed.append('{}: {}'.format(data_file.name, reason))
+        self.results.failed.append('{}: {}'.format(self.project_path(data_file), reason))
         log('Failed: {}: {}'.format(self.project_path(data_file), reason))
 
     def record_type_failure(self, message, export_path=None):
