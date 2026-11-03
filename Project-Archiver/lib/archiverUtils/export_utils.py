@@ -44,7 +44,7 @@ current_exports = []
 FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
-# Data file ids of the documents the user already had open when the export started.
+# Data file version ids of the documents the user already had open when the export started.
 # These are left open rather than closed after export.
 OPEN_BEFORE_EXPORT = set()
 
@@ -457,10 +457,13 @@ def export_electronics_file(data_file, output_folder, write_version):
 
 
 def get_data_file_id(document):
-    """Return the id of the data file a document was opened from, or None for an unsaved document."""
+    """Return the version id of the data file a document was opened from, or None for an unsaved document.
+
+    Every version of a data file has the same id, so the version id is used to tell them apart.
+    """
     try:
         data_file = document.dataFile
-        return data_file.id if data_file else None
+        return data_file.versionId if data_file else None
     except RuntimeError:
         return None
 
@@ -486,12 +489,12 @@ def open_doc(data_file):
 
     for i in range(app.documents.count):
         document = app.documents.item(i)
-        if get_data_file_id(document) == data_file.id:
+        if get_data_file_id(document) == data_file.versionId:
             try:
                 document.activate()
             except RuntimeError:
                 pass
-            if get_data_file_id(app.activeDocument) == data_file.id:
+            if get_data_file_id(app.activeDocument) == data_file.versionId:
                 return document
 
     return None
