@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-  <rect x="6.5" y="18.5" width="19" height="11" fill="#3A4652" stroke="#E2E6EA"/>
-  <rect x="4.5" y="13.5" width="23" height="5" fill="#3A4652" stroke="#E2E6EA"/>
-  <rect x="12.5" y="22.5" width="7" height="2" rx="1" fill="none" stroke="#E2E6EA"/>
-  <rect x="14.5" y="1" width="3" height="6" fill="#38ABDF"/>
-  <path d="M10 7 H22 L16 13 Z" fill="#38ABDF"/>
+  <rect x="5.5" y="23.5" width="21" height="6" fill="#3A4652" stroke="#E2E6EA"/>
+  <rect x="3.5" y="20.5" width="25" height="3" fill="#3A4652" stroke="#E2E6EA"/>
+  <rect x="13.5" y="25.5" width="5" height="2" rx="1" fill="none" stroke="#E2E6EA"/>
+  <rect x="8.5" y="14.5" width="15" height="6" fill="#3A4652" stroke="#E2E6EA"/>
+  <rect x="6.5" y="11.5" width="19" height="3" fill="#3A4652" stroke="#E2E6EA"/>
+  <rect x="13.5" y="16.5" width="5" height="2" rx="1" fill="none" stroke="#E2E6EA"/>
+  <rect x="14.5" y="0" width="3" height="5" fill="#38ABDF"/>
+  <path d="M10 5 H22 L16 10.5 Z" fill="#38ABDF"/>
 </svg>
