@@ -31,12 +31,20 @@ app = adsk.core.Application.get()
 ui = app.userInterface
 
 SKIPPED_FILES = []
+EXISTING_FILES_SKIPPED = []
 FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
 # Data file ids of the documents the user already had open when the export started.
 # These are left open rather than closed after export.
 OPEN_BEFORE_EXPORT = set()
+
+# What to do when an export file already exists. The values are the Existing files dropdown items.
+EXISTING_FILES_RENAME = 'Rename with -dup'
+EXISTING_FILES_SKIP = 'Skip existing files'
+EXISTING_FILES_OVERWRITE = 'Overwrite'
+EXISTING_FILES_OPTIONS = [EXISTING_FILES_RENAME, EXISTING_FILES_SKIP, EXISTING_FILES_OVERWRITE]
+existing_files = EXISTING_FILES_RENAME
 
 # True from the end of an export until Close All has finished cleaning up after it
 EXPORT_CLEANUP_PENDING = False
@@ -53,7 +61,10 @@ ELECTRONICS_EXPORTS = {
 # extensions in the hub, distinct from the EAGLE export extensions (.sch/.brd/.lbr)
 # produced on export. An electronics design (fprj) is skipped: its schematic and
 # board are separate fsch and fbrd files that are exported on their own.
-ELECTRONICS_EXTENSIONS = {'fsch', 'fbrd', 'flbr'}
+ELECTRONICS_EXTENSIONS = {'fsch': '.sch', 'fbrd': '.brd', 'flbr': '.lbr'}
+
+# Design export type name -> file extension
+DESIGN_EXTENSIONS = {'IGES': '.igs', 'STEP': '.step', 'SAT': '.sat', 'SMT': '.smt', 'F3D': '.f3d', 'STL': '.stl'}
 
 # Drawing export type name -> (factory method name on the DrawingExportManager, file extension).
 # DXF and DWG export are preview APIs, so each factory is checked before it's used.
@@ -84,18 +95,22 @@ def get_active_design():
 
 def clear_export_messages():
     SKIPPED_FILES.clear()
+    EXISTING_FILES_SKIPPED.clear()
     FAILED_FILES.clear()
     ELECTRONICS_ERRORS.clear()
 
 
 def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
-                   export_electronics):
+                   export_electronics, existing_files_option=EXISTING_FILES_RENAME):
     """Export every document in the active project.
 
     Files that could not be exported are collected and reported by show_export_summary
     once the opened documents have been closed.
     """
     root_folder = get_active_project().rootFolder
+
+    global existing_files
+    existing_files = existing_files_option
 
     # Make sure we have a folder not a file
     if not output_folder.endswith(os.path.sep):
@@ -124,6 +139,11 @@ def show_export_summary():
     "failed to find product", so this is called after they have been closed.
     """
     messages = []
+
+    if len(EXISTING_FILES_SKIPPED) > 0:
+        messages.append(
+            "{} files already existed in the output folder and were skipped.".format(len(EXISTING_FILES_SKIPPED))
+        )
 
     if len(SKIPPED_FILES) > 0:
         messages.append(
@@ -186,6 +206,14 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
 
     A file that fails is recorded and skipped so the rest of the project is still exported.
     """
+    # The document name is known without opening the design, so existing files can be skipped early
+    if name_option == 'Document name':
+        extensions = [extension for type_name, extension in DESIGN_EXTENSIONS.items()
+                      if is_type_selected(file_types, type_name)
+                      and not (type_name == 'F3D' and data_file.hasChildReferences)]
+        if all_exports_exist(data_file, output_folder, extensions, write_version):
+            return
+
     document = open_doc(data_file)
 
     if document is None:
@@ -205,6 +233,11 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
 
 def export_drawing_file(data_file, output_folder, drawing_types, write_version):
     """Open a drawing, export it to the selected types, and close it again."""
+    extensions = [extension for type_name, (_, extension) in DRAWING_EXPORTS.items()
+                  if is_type_selected(drawing_types, type_name)]
+    if all_exports_exist(data_file, output_folder, extensions, write_version):
+        return
+
     document = open_doc(data_file)
 
     if document is None:
@@ -240,7 +273,9 @@ def export_drawing_doc(document, folder, drawing_types, output_name):
             continue
 
         try:
-            export_name = dup_check(folder + output_name + extension)
+            export_name = get_export_path(folder + output_name + extension)
+            if export_name is None:
+                continue
             export_options = getattr(export_mgr, factory_name)(export_name)
 
             if type_name == 'PDF':
@@ -255,6 +290,9 @@ def export_drawing_doc(document, folder, drawing_types, output_name):
 
 def export_electronics_file(data_file, output_folder, write_version):
     """Open an electronics document, export it to its EAGLE format, and close it again."""
+    if all_exports_exist(data_file, output_folder, [ELECTRONICS_EXTENSIONS[data_file.fileExtension]], write_version):
+        return
+
     document = open_doc(data_file)
 
     if document is None:
@@ -405,8 +443,9 @@ def export_active_doc(folder, file_types, output_name):
 
     for type_name, (export_function, extension) in solid_export_functions.items():
         if is_type_selected(file_types, type_name):
-            export_name = folder + output_name + extension
-            export_name = dup_check(export_name)
+            export_name = get_export_path(folder + output_name + extension)
+            if export_name is None:
+                continue
             export_options = export_function(export_name)
             export_mgr.execute(export_options)
 
@@ -416,16 +455,16 @@ def export_active_doc(folder, file_types, output_name):
             SKIPPED_FILES.append(document.name)
 
         else:
-            export_name = folder + output_name + '.f3d'
-            export_name = dup_check(export_name)
-            export_options = export_mgr.createFusionArchiveExportOptions(export_name)
-            export_mgr.execute(export_options)
+            export_name = get_export_path(folder + output_name + '.f3d')
+            if export_name is not None:
+                export_options = export_mgr.createFusionArchiveExportOptions(export_name)
+                export_mgr.execute(export_options)
 
     if is_type_selected(file_types, 'STL'):
-        stl_export_name = folder + output_name + '.stl'
-        stl_export_name = dup_check(stl_export_name)
-        stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
-        export_mgr.execute(stl_options)
+        stl_export_name = get_export_path(folder + output_name + '.stl')
+        if stl_export_name is not None:
+            stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
+            export_mgr.execute(stl_options)
 
 
 def _export_one_electronics_format(product, type_name, folder, output_name):
@@ -451,8 +490,9 @@ def _export_one_electronics_format(product, type_name, folder, output_name):
             )
             return
 
-        export_name = folder + output_name + extension
-        export_name = dup_check(export_name)
+        export_name = get_export_path(folder + output_name + extension)
+        if export_name is None:
+            return
 
         export_options = getattr(export_mgr, factory_name)(export_name)
 
@@ -506,6 +546,42 @@ def export_electronics_doc(folder, output_name):
 
     elif library is not None:
         _export_one_electronics_format(library, 'LBR', folder, output_name)
+
+
+def get_export_path(path):
+    """Return the path to export to, or None to skip it, based on the Existing files option."""
+    if not os.path.exists(path):
+        return path
+
+    if existing_files == EXISTING_FILES_SKIP:
+        EXISTING_FILES_SKIPPED.append(path)
+        return None
+
+    if existing_files == EXISTING_FILES_OVERWRITE:
+        os.remove(path)
+        return path
+
+    return dup_check(path)
+
+
+def all_exports_exist(data_file, folder, extensions, write_version):
+    """With Skip existing files, return True if every export of a data file already exists.
+
+    Uses the name the document will have when opened, so the file doesn't need to be opened.
+    """
+    if existing_files != EXISTING_FILES_SKIP or not extensions:
+        return False
+
+    name = data_file.name
+    if write_version:
+        name += ' v{}'.format(data_file.versionNumber)
+
+    paths = [folder + sanitize_name(name) + extension for extension in extensions]
+    if all(os.path.exists(path) for path in paths):
+        EXISTING_FILES_SKIPPED.extend(paths)
+        return True
+
+    return False
 
 
 def get_document_name(write_version):

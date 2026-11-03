@@ -128,6 +128,12 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
                                                        True)
     preserve_input.isVisible = True
 
+    existing_files_input = advanced_inputs.addDropDownCommandInput('existing_files', 'Existing files',
+                                                                   adsk.core.DropDownStyles.TextListDropDownStyle)
+    for option in archiverUtils.EXISTING_FILES_OPTIONS:
+        existing_files_input.listItems.add(option, option == archiverUtils.EXISTING_FILES_RENAME)
+    existing_files_input.tooltip = 'What to do when a file with the same name is already in the output folder'
+
     update_name_inputs(inputs, 'Document name')
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
@@ -150,6 +156,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     preserve_input: adsk.core.BoolValueCommandInput = inputs.itemById('folder_preserve_id')
     version_input: adsk.core.BoolValueCommandInput = inputs.itemById('write_version')
     electronics_input: adsk.core.BoolValueCommandInput = inputs.itemById('export_electronics')
+    existing_files_input: adsk.core.DropDownCommandInput = inputs.itemById('existing_files')
 
     archiverUtils.export_project(
         output_folder_input.value,
@@ -158,7 +165,8 @@ def command_execute(args: adsk.core.CommandEventArgs):
         version_input.value,
         name_option_input.selectedItem.name,
         preserve_input.value,
-        electronics_input.value
+        electronics_input.value,
+        existing_files_input.selectedItem.name
     )
 
     # Close the documents that were opened for export. Close All shows the export summary when it finishes.
