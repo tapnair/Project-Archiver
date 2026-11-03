@@ -12,8 +12,8 @@ ui = app.userInterface
 
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_exportProject'
-CMD_NAME = 'Export Active Project'
-CMD_Description = 'Exports all Fusion Documents in the currently active project'
+CMD_NAME = 'Export active project'
+CMD_Description = 'Exports the designs, drawings and electronics documents in the project selected in the Data Panel'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True

@@ -11,8 +11,8 @@ ui = app.userInterface
 
 
 CMD_ID = config.close_all_cmd_id
-CMD_NAME = 'Close All Docs'
-CMD_Description = 'Close All Docs'
+CMD_NAME = 'Close all documents'
+CMD_Description = 'Closes all saved documents, including designs loaded in the background by an assembly'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True
