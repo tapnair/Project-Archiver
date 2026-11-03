@@ -1,6 +1,8 @@
 #  Copyright (c) 2019-2026 Patrick Rainsberry
 #  Licensed under the Apache License, Version 2.0. See LICENSE for details.
 
+"""Logs an export to the Text Commands window and to a log file in the output folder."""
+
 import os
 import time
 

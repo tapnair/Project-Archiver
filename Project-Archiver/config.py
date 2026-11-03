@@ -21,13 +21,13 @@ ADDIN_NAME = os.path.basename(os.path.dirname(__file__))
 COMPANY_NAME = 'Autodesk'
 
 # Name of the folder created in the user's home directory as the default export location
-user_dir_name = 'ProjectArchiver'
+USER_DIR_NAME = 'ProjectArchiver'
 
 # Location of the Archive panel shared by all commands
-design_workspace = 'FusionSolidEnvironment'
-tools_tab_id = 'ToolsTab'
-archive_panel_id = f'{COMPANY_NAME}_{ADDIN_NAME}_archive_panel'
-archive_panel_name = 'Archive'
+DESIGN_WORKSPACE_ID = 'FusionSolidEnvironment'
+TOOLS_TAB_ID = 'ToolsTab'
+ARCHIVE_PANEL_ID = f'{COMPANY_NAME}_{ADDIN_NAME}_archive_panel'
+ARCHIVE_PANEL_NAME = 'Archive'
 
 # Command IDs that are referenced by more than one command
-close_all_cmd_id = f'{COMPANY_NAME}_{ADDIN_NAME}_closeAll'
+CLOSE_ALL_CMD_ID = f'{COMPANY_NAME}_{ADDIN_NAME}_closeAll'

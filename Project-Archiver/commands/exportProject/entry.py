@@ -90,12 +90,11 @@ def command_execute(args: adsk.core.CommandEventArgs):
 # allowing you to modify values of other inputs based on that change.
 def command_input_changed(args: adsk.core.InputChangedEventArgs):
     changed_input = args.input
-    inputs = args.inputs
 
     # General logging for debug.
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
-    export_dialog.handle_input_changed(changed_input, inputs)
+    export_dialog.handle_input_changed(changed_input)
 
 
 # This event handler is called when the user interacts with any of the inputs in the dialog

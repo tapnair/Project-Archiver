@@ -10,7 +10,7 @@ app = adsk.core.Application.get()
 ui = app.userInterface
 
 
-CMD_ID = config.close_all_cmd_id
+CMD_ID = config.CLOSE_ALL_CMD_ID
 CMD_NAME = 'Close all documents'
 CMD_Description = 'Closes all saved documents, including designs loaded in the background by an assembly'
 
@@ -73,13 +73,14 @@ def command_execute(args: adsk.core.CommandEventArgs):
     global pass_count
     pass_count += 1
 
-    if archiverUtils.close_documents_pass() and pass_count < MAX_PASSES:
+    # After an export, the documents the user already had open are left open
+    if archiverUtils.close_documents_pass(archiverUtils.get_keep_version_ids()) and pass_count < MAX_PASSES:
         close_command = ui.commandDefinitions.itemById(CMD_ID)
         close_command.execute()
 
     else:
         pass_count = 0
-        archiverUtils.finish_close_all()
+        archiverUtils.finish_export()
 
 
 # This event handler is called when the command terminates.

@@ -1,6 +1,8 @@
 #  Copyright (c) 2019-2026 Patrick Rainsberry
 #  Licensed under the Apache License, Version 2.0. See LICENSE for details.
 
+"""Helpers for local file and folder names and paths."""
+
 import os
 import re
 
@@ -38,11 +40,10 @@ def get_default_dir(dir_name: str) -> str:
     return default_dir
 
 
-def dup_check(name: str) -> str:
-    """Append -dup to a file name if a file with that name already exists."""
-    if os.path.exists(name):
-        base, ext = os.path.splitext(name)
+def dup_check(path: str) -> str:
+    """Return path, with -dup added before the extension as many times as needed to make it unused."""
+    base, ext = os.path.splitext(path)
+    while os.path.exists(path):
         base += '-dup'
-        name = base + ext
-        name = dup_check(name)
-    return name
+        path = base + ext
+    return path

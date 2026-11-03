@@ -27,7 +27,7 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 local_handlers = []
 
 # The Data Panel folder shown in the dialog, which is the one exported
-export_folder = None
+data_folder = None
 
 
 # Executed when add-in is run.
@@ -62,10 +62,10 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # The command exports the folder open in the Data Panel. In the rare case Fusion
     # can't provide one, open the Data Panel and don't show the dialog.
-    global export_folder
+    global data_folder
     project = archiverUtils.get_active_project()
-    export_folder = archiverUtils.get_active_folder()
-    if project is None or export_folder is None:
+    data_folder = archiverUtils.get_active_folder()
+    if project is None or data_folder is None:
         app.data.isDataPanelVisible = True
         ui.messageBox('Fusion could not find an active folder.\n\n'
                       'In the Data Panel, navigate to the folder you want to archive, '
@@ -76,7 +76,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     inputs = args.command.commandInputs
 
     # Show which folder will be archived, since that's whatever is open in the Data Panel
-    folder_path = archiverUtils.get_folder_path(export_folder)
+    folder_path = archiverUtils.get_folder_path(data_folder)
     location = '/'.join([project.name] + folder_path) if folder_path else f'{project.name} (project root)'
     export_dialog.add_export_inputs(inputs, 'Folder:', location, project.name)
 
@@ -91,19 +91,18 @@ def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Execute Event')
 
-    export_dialog.run_export(args.command.commandInputs, export_folder)
+    export_dialog.run_export(args.command.commandInputs, data_folder)
 
 
 # This event handler is called when the user changes anything in the command dialog
 # allowing you to modify values of other inputs based on that change.
 def command_input_changed(args: adsk.core.InputChangedEventArgs):
     changed_input = args.input
-    inputs = args.inputs
 
     # General logging for debug.
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
-    export_dialog.handle_input_changed(changed_input, inputs)
+    export_dialog.handle_input_changed(changed_input)
 
 
 # This event handler is called when the user interacts with any of the inputs in the dialog
@@ -118,6 +117,6 @@ def command_destroy(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Destroy Event')
 
-    global local_handlers, export_folder
+    global local_handlers, data_folder
     local_handlers = []
-    export_folder = None
+    data_folder = None

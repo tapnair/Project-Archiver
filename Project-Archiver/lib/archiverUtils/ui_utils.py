@@ -1,6 +1,8 @@
 #  Copyright (c) 2019-2026 Patrick Rainsberry
 #  Licensed under the Apache License, Version 2.0. See LICENSE for details.
 
+"""Adds and removes the Archive panel and its command buttons."""
+
 import adsk.core
 
 from ... import config
@@ -11,20 +13,20 @@ ui = app.userInterface
 
 def get_archive_panel() -> adsk.core.ToolbarPanel:
     """Get the Archive panel on the Tools tab of the Design workspace, creating it if necessary."""
-    workspace = ui.workspaces.itemById(config.design_workspace)
-    toolbar_tab = workspace.toolbarTabs.itemById(config.tools_tab_id)
+    workspace = ui.workspaces.itemById(config.DESIGN_WORKSPACE_ID)
+    toolbar_tab = workspace.toolbarTabs.itemById(config.TOOLS_TAB_ID)
 
-    panel = toolbar_tab.toolbarPanels.itemById(config.archive_panel_id)
+    panel = toolbar_tab.toolbarPanels.itemById(config.ARCHIVE_PANEL_ID)
     if panel is None:
-        panel = toolbar_tab.toolbarPanels.add(config.archive_panel_id, config.archive_panel_name)
+        panel = toolbar_tab.toolbarPanels.add(config.ARCHIVE_PANEL_ID, config.ARCHIVE_PANEL_NAME)
 
     return panel
 
 
 def remove_command(cmd_id: str):
     """Delete a command's control and definition, and delete the Archive panel once it is empty."""
-    workspace = ui.workspaces.itemById(config.design_workspace)
-    panel = workspace.toolbarPanels.itemById(config.archive_panel_id)
+    workspace = ui.workspaces.itemById(config.DESIGN_WORKSPACE_ID)
+    panel = workspace.toolbarPanels.itemById(config.ARCHIVE_PANEL_ID)
 
     if panel:
         command_control = panel.controls.itemById(cmd_id)
