@@ -102,6 +102,14 @@ def get_active_project():
         return None
 
 
+def get_active_folder():
+    """Return the folder open in the Data Panel, or None if Fusion can't provide one."""
+    try:
+        return app.data.activeFolder
+    except RuntimeError:
+        return None
+
+
 def get_active_design():
     """Return the Design product of the active document, or None if it has no design."""
     document = app.activeDocument
@@ -118,13 +126,16 @@ def clear_export_messages():
 
 def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
                    export_electronics, existing_files_option=EXISTING_FILES_RENAME, skip_used_designs_option=False,
-                   include_hidden_option=False):
-    """Export every document in the active project.
+                   include_hidden_option=False, data_folder=None):
+    """Export every document in the active project, or in data_folder and its subfolders.
 
+    With folder_preserve, a folder's files go under its path in the project, where an export of
+    the whole project would put them, so folder-by-folder exports build up the same archive.
     Files that could not be exported are collected and reported by show_export_summary
     once the opened documents have been closed.
     """
-    root_folder = get_active_project().rootFolder
+    root_folder = data_folder or get_active_project().rootFolder
+    folder_path = get_folder_path(root_folder)
 
     global existing_files, skip_used_designs, include_hidden
     existing_files = existing_files_option
@@ -135,6 +146,10 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
     if not output_folder.endswith(os.path.sep):
         output_folder += os.path.sep
 
+    log_folder = output_folder
+    if folder_preserve and folder_path:
+        output_folder = os.path.join(output_folder, *[sanitize_name(name) for name in folder_path], '')
+
     # Create the base folder for this output if doesn't exist
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -144,8 +159,9 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
         OPEN_BEFORE_EXPORT.add(get_data_file_id(app.documents.item(i)))
     OPEN_BEFORE_EXPORT.discard(None)
 
-    start_log(output_folder, [
+    start_log(log_folder, [
         'Project: {}'.format(get_active_project().name),
+        'Folder: {}'.format('/'.join(folder_path) if folder_path else 'whole project'),
         'Output folder: {}'.format(output_folder),
         'Design export types: {}'.format(', '.join(selected_type_names(file_types)) or 'none'),
         'Drawing export types: {}'.format(', '.join(selected_type_names(drawing_types)) or 'none'),
@@ -683,6 +699,15 @@ def export_electronics_doc(folder, output_name):
 
     elif library is not None:
         _export_one_electronics_format(library, 'LBR', folder, output_name)
+
+
+def get_folder_path(data_folder):
+    """Return the names of the folders from the project root down to a data folder, or [] for the root."""
+    names = []
+    while data_folder is not None and data_folder.parentFolder is not None:
+        names.insert(0, data_folder.name)
+        data_folder = data_folder.parentFolder
+    return names
 
 
 def get_project_path(data_file):

@@ -103,9 +103,10 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     update_name_inputs(inputs, 'Document name')
 
 
-def run_export(inputs: adsk.core.CommandInputs):
+def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolder = None):
     """Export using the values in the dialog, then close the documents that were opened for export.
 
+    Exports the whole active project, or data_folder and its subfolders if given.
     Close All shows the export summary when it finishes.
     """
     output_folder_input: adsk.core.StringValueCommandInput = inputs.itemById('output_folder')
@@ -135,7 +136,8 @@ def run_export(inputs: adsk.core.CommandInputs):
         electronics_input.value,
         existing_files_input.selectedItem.name,
         skip_used_input.value,
-        hidden_input.value
+        hidden_input.value,
+        data_folder
     )
 
     close_command = ui.commandDefinitions.itemById(config.close_all_cmd_id)

@@ -3,11 +3,13 @@
 # If you want to add an additional command, duplicate one of the existing directories and import it here.
 # You need to use aliases (import "entry" as "my_module") assuming you have the default module named "entry".
 from .exportProject import entry as exportProject
+from .exportFolder import entry as exportFolder
 from .closeAll import entry as closeAll
 
 # Fusion will automatically call the start() and stop() functions.
 commands = [
     exportProject,
+    exportFolder,
     closeAll
 ]
 
