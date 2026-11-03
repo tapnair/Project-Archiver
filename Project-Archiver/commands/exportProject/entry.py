@@ -113,6 +113,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
+    futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
 
@@ -158,6 +159,21 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     if changed_input.id == 'name_option_id':
         name_option_input: adsk.core.DropDownCommandInput = changed_input
         update_name_inputs(inputs, name_option_input.selectedItem.name)
+
+
+# This event handler is called when the user interacts with any of the inputs in the dialog
+# which allows you to verify that all of the inputs are valid and enables the OK button.
+def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
+    inputs = args.inputs
+    file_types_input: adsk.core.DropDownCommandInput = inputs.itemById('file_types_input')
+    drawing_types_input: adsk.core.DropDownCommandInput = inputs.itemById('drawing_types_input')
+    electronics_input: adsk.core.BoolValueCommandInput = inputs.itemById('export_electronics')
+
+    # Only allow OK when there is something to export
+    args.areInputsValid = (archiverUtils.any_type_selected(file_types_input.listItems)
+                           or (drawing_types_input.isVisible
+                               and archiverUtils.any_type_selected(drawing_types_input.listItems))
+                           or (electronics_input.isVisible and electronics_input.value))
 
 
 # Only show the write version option when naming files by document name.
