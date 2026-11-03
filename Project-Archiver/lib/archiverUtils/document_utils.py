@@ -104,6 +104,21 @@ def open_data_file(data_file):
     return None
 
 
+def is_other_version_open(data_file):
+    """Return True if a different version of a data file is open, including in the background.
+
+    Fusion won't open a version of a design while another version of it is open.
+    """
+    for i in range(app.documents.count):
+        try:
+            open_file = app.documents.item(i).dataFile
+        except RuntimeError:
+            continue
+        if open_file and open_file.id == data_file.id and open_file.versionId != data_file.versionId:
+            return True
+    return False
+
+
 def close_document(document):
     """Close a document without saving. A document that really doesn't close is left for Close All."""
     try:

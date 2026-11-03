@@ -315,7 +315,11 @@ class Exporter:
         document = document_utils.open_data_file(data_file)
         self.opened_in_workspace = ui.activeWorkspace.id
         if document is None:
-            self.record_failure(data_file, 'could not be opened')
+            if document_utils.is_other_version_open(data_file):
+                self.record_failure(data_file, 'could not be opened because another version of it is open in Fusion. '
+                                               'Export again with Skip existing files to fill it in')
+            else:
+                self.record_failure(data_file, 'could not be opened')
             return
 
         self.current_exports.clear()
