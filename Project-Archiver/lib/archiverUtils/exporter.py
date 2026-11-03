@@ -103,9 +103,9 @@ class Exporter:
         # The output folder chosen in the dialog, where the log file goes
         self.log_folder = options.output_folder
 
-        # The workspace Fusion switched to when the current file was opened, to tell a
+        # The workspaces Fusion has been in since the progress dialog was last shown, to tell a
         # workspace switch from the user clicking Cancel
-        self.opened_in_workspace = None
+        self.workspaces_seen = set()
 
     # ----------------------------------------------------------------------------------------
     # Running the export
@@ -227,29 +227,29 @@ class Exporter:
     def export_with_progress(self, exports):
         """Export each file, showing progress with a Cancel button that stops before the next file."""
         progress = show_progress(len(exports), 0)
-        workspace_changed = False
+        self.workspaces_seen = {ui.activeWorkspace.id}
 
         try:
             for index, (export_method, data_file, output_folder) in enumerate(exports):
                 if progress.wasCancelled:
-                    # Opening some documents, such as electronics documents, switches Fusion to another
-                    # workspace, which closes the progress dialog and reports it as cancelled. Only a
-                    # cancel without a workspace change came from the user.
-                    if not workspace_changed:
+                    # Opening and closing some documents, such as electronics documents, switches Fusion
+                    # to another workspace and back, which closes the progress dialog and reports it as
+                    # cancelled. Only a cancel without a workspace change since the dialog was shown
+                    # came from the user.
+                    if len(self.workspaces_seen) == 1:
                         self.results.cancelled = (index, len(exports))
                         log('Cancelled after {} of {} files'.format(index, len(exports)))
                         break
 
                     progress.hide()
                     progress = show_progress(len(exports), index)
+                    self.workspaces_seen = {ui.activeWorkspace.id}
 
                 progress.message = '{}Exporting %v of %m: {}'.format(self.progress_label, self.project_path(data_file))
                 progress.progressValue = index
 
-                workspace = ui.activeWorkspace.id
-                self.opened_in_workspace = workspace
                 export_method(data_file, output_folder)
-                workspace_changed = self.opened_in_workspace != workspace
+                self.note_workspace()
 
             else:
                 progress.progressValue = len(exports)
@@ -313,7 +313,7 @@ class Exporter:
         Documents the user already had open are left open.
         """
         document = document_utils.open_data_file(data_file)
-        self.opened_in_workspace = ui.activeWorkspace.id
+        self.note_workspace()
         if document is None:
             if document_utils.is_other_version_open(data_file):
                 self.record_failure(data_file, 'could not be opened because another version of it is open in Fusion. '
@@ -333,6 +333,14 @@ class Exporter:
         finally:
             if document_utils.get_version_id(document) not in self.open_before_export:
                 document_utils.close_document(document)
+            self.note_workspace()
+
+    def note_workspace(self):
+        """Record the workspace Fusion is in, to tell a workspace switch from the user clicking Cancel."""
+        try:
+            self.workspaces_seen.add(ui.activeWorkspace.id)
+        except RuntimeError:
+            pass
 
     # ----------------------------------------------------------------------------------------
     # Exporting the open document
