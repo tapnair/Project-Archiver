@@ -48,6 +48,9 @@ ui = app.userInterface
 # The export that Close all documents is cleaning up after, or None
 pending_export = None
 
+# Longest list of files shown in the summary message; the log file lists every file
+MAX_LISTED_IN_SUMMARY = 15
+
 
 def export(options: ExportOptions):
     """Export with the given options. Close all documents finishes it by calling finish_export."""
@@ -83,6 +86,9 @@ class Exporter:
         # Paths written for the file currently being exported, for the log
         self.current_exports = []
 
+        # The output folder chosen in the dialog, where the log file goes
+        self.log_folder = options.output_folder
+
         # The workspace Fusion switched to when the current file was opened, to tell a
         # workspace switch from the user clicking Cancel
         self.opened_in_workspace = None
@@ -104,15 +110,15 @@ class Exporter:
 
         # A folder's files go under its path in the project, where a whole-project export would put
         # them, so folder-by-folder exports build up the same archive. The log stays at the top.
-        log_folder = os.path.join(options.output_folder, '')
-        output_folder = log_folder
+        self.log_folder = os.path.join(options.output_folder, '')
+        output_folder = self.log_folder
         if options.preserve_folders and folder_path:
-            output_folder = os.path.join(log_folder, *[sanitize_name(name) for name in folder_path], '')
+            output_folder = os.path.join(self.log_folder, *[sanitize_name(name) for name in folder_path], '')
         os.makedirs(output_folder, exist_ok=True)
 
         self.open_before_export = frozenset(document_utils.get_open_version_ids())
 
-        start_log(log_folder, [
+        start_log(self.log_folder, [
             'Project: {}'.format(project.name),
             'Folder: {}'.format('/'.join(folder_path) if folder_path else 'whole project'),
             'Output folder: {}'.format(output_folder),
@@ -135,7 +141,7 @@ class Exporter:
             else:
                 self.export_with_progress(exports)
 
-        end_log(self.get_summary_messages() or ['Every file was exported.'])
+        end_log(self.get_summary_messages())
 
     def collect_exports(self, data_folder, output_folder):
         """List the files to export in a folder and its subfolders, without opening any of them.
@@ -521,10 +527,13 @@ class Exporter:
         if export_path in self.current_exports:
             self.current_exports.remove(export_path)
 
-    def get_summary_messages(self):
-        """Return the messages that summarize what wasn't exported."""
+    def get_summary_messages(self, max_listed=None):
+        """Return the paragraphs that summarize the export, starting with how many files were written.
+
+        Lists of files are cut to max_listed entries for the message box; the log gets every entry.
+        """
         results = self.results
-        messages = []
+        messages = ['Exported {} to {}'.format(plural(results.exported_files, 'file'), self.log_folder)]
 
         if results.declined:
             messages.append('The export was cancelled before any files were exported.')
@@ -534,33 +543,31 @@ class Exporter:
                             'Skip existing files to continue where it stopped.'.format(*results.cancelled))
 
         if results.used_designs_skipped:
-            messages.append('{} designs used by other designs were skipped.'.format(len(results.used_designs_skipped)))
+            messages.append('Skipped {} used by other designs.'.format(
+                plural(len(results.used_designs_skipped), 'design')))
 
         if results.existing_skipped:
-            messages.append('{} files already existed in the output folder and were skipped.'.format(
-                len(results.existing_skipped)))
+            messages.append('Skipped {} that already existed in the output folder.'.format(
+                plural(len(results.existing_skipped), 'file')))
 
         if results.f3d_skipped:
             messages.append(
-                "These designs reference other designs, so they weren't exported as F3D:\n{}\n\n"
+                "These designs reference other designs, so they weren't exported as F3D:\n{}\n"
                 "An F3D of a design like this only links to the referenced designs and can't be opened on its own. "
                 "The other export types were still exported, and each referenced design gets its own F3D. "
                 "To keep a design with everything it references, open it and use File > Export to save an F3Z.".format(
-                    '\n'.join(results.f3d_skipped)))
+                    list_lines(results.f3d_skipped, max_listed)))
 
         if results.failed:
-            messages.append('The following files could not be exported:\n{}'.format('\n'.join(results.failed)))
+            messages.append('These files could not be exported:\n{}'.format(list_lines(results.failed, max_listed)))
 
         return messages
 
     def show_summary(self):
-        """Show what wasn't exported, once the exported documents have been closed."""
-        messages = self.get_summary_messages()
-        if messages:
-            messages.append('Details for every file are in {} in the output folder.'.format(LOG_FILE_NAME))
-
-        for message in messages:
-            ui.messageBox(message)
+        """Show the summary in one message box, once the exported documents have been closed."""
+        messages = self.get_summary_messages(MAX_LISTED_IN_SUMMARY)
+        messages.append('Details for every file are in {} in the output folder.'.format(LOG_FILE_NAME))
+        ui.messageBox('\n\n'.join(messages), 'Project Archiver')
 
 
 def show_progress(total, value):
@@ -575,6 +582,18 @@ def show_progress(total, value):
     progress.show('Project Archiver', 'Exporting %v of %m', 0, total)
     progress.progressValue = value
     return progress
+
+
+def plural(count, noun):
+    """Return "1 file" or "3 files"."""
+    return '{} {}{}'.format(count, noun, '' if count == 1 else 's')
+
+
+def list_lines(items, max_listed=None):
+    """Return items one per line, cut to max_listed with a count of the rest."""
+    if max_listed is None or len(items) <= max_listed:
+        return '\n'.join(items)
+    return '\n'.join(items[:max_listed] + ['...and {} more'.format(len(items) - max_listed)])
 
 
 def strip_version(name):
