@@ -33,6 +33,7 @@ ui = app.userInterface
 
 SKIPPED_FILES = []
 EXISTING_FILES_SKIPPED = []
+USED_DESIGNS_SKIPPED = []
 FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
@@ -46,6 +47,9 @@ EXISTING_FILES_SKIP = 'Skip existing files'
 EXISTING_FILES_OVERWRITE = 'Overwrite'
 EXISTING_FILES_OPTIONS = [EXISTING_FILES_RENAME, EXISTING_FILES_SKIP, EXISTING_FILES_OVERWRITE]
 existing_files = EXISTING_FILES_RENAME
+
+# When True, designs inserted into other designs aren't exported on their own
+skip_used_designs = False
 
 # True from the end of an export until Close All has finished cleaning up after it
 EXPORT_CLEANUP_PENDING = False
@@ -97,12 +101,13 @@ def get_active_design():
 def clear_export_messages():
     SKIPPED_FILES.clear()
     EXISTING_FILES_SKIPPED.clear()
+    USED_DESIGNS_SKIPPED.clear()
     FAILED_FILES.clear()
     ELECTRONICS_ERRORS.clear()
 
 
 def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
-                   export_electronics, existing_files_option=EXISTING_FILES_RENAME):
+                   export_electronics, existing_files_option=EXISTING_FILES_RENAME, skip_used_designs_option=False):
     """Export every document in the active project.
 
     Files that could not be exported are collected and reported by show_export_summary
@@ -110,8 +115,9 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
     """
     root_folder = get_active_project().rootFolder
 
-    global existing_files
+    global existing_files, skip_used_designs
     existing_files = existing_files_option
+    skip_used_designs = skip_used_designs_option
 
     # Make sure we have a folder not a file
     if not output_folder.endswith(os.path.sep):
@@ -140,6 +146,11 @@ def show_export_summary():
     "failed to find product", so this is called after they have been closed.
     """
     messages = []
+
+    if len(USED_DESIGNS_SKIPPED) > 0:
+        messages.append(
+            "{} designs used by other designs were skipped.".format(len(USED_DESIGNS_SKIPPED))
+        )
 
     if len(EXISTING_FILES_SKIPPED) > 0:
         messages.append(
@@ -207,6 +218,10 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
 
     A file that fails is recorded and skipped so the rest of the project is still exported.
     """
+    if skip_used_designs and is_used_by_other_designs(data_file):
+        USED_DESIGNS_SKIPPED.append(data_file.name)
+        return
+
     # The document name is known without opening the design, so existing files can be skipped early
     if name_option == 'Document name':
         extensions = [extension for type_name, extension in DESIGN_EXTENSIONS.items()
@@ -547,6 +562,17 @@ def export_electronics_doc(folder, output_name):
 
     elif library is not None:
         _export_one_electronics_format(library, 'LBR', folder, output_name)
+
+
+def is_used_by_other_designs(data_file):
+    """Return True if a design is inserted into another design, which is known without opening it.
+
+    Drawings of a design also count as parent references, so only designs are considered.
+    """
+    if not data_file.hasParentReferences:
+        return False
+
+    return any(parent.fileExtension == 'f3d' for parent in data_file.parentReferences)
 
 
 def get_export_path(path):
