@@ -524,17 +524,17 @@ def get_document_name(write_version):
 
 
 def get_name(write_version, option):
-    """Derive an output name for a design using the selected File Name Option.
+    """Derive an output name for a design using the selected file name option.
 
     Falls back to the document name when the description or part number is empty.
     """
-    if option == 'Document Name':
+    if option == 'Document name':
         return get_document_name(write_version)
 
     elif option == 'Description':
         output_name = get_active_design().rootComponent.description
 
-    elif option == 'Part Number':
+    elif option == 'Part number':
         output_name = get_active_design().rootComponent.partNumber
 
     else:

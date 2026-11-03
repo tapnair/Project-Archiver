@@ -70,9 +70,9 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # https://help.autodesk.com/view/fusion360/ENU/?contextId=CommandInputs
     inputs = args.command.commandInputs
 
-    inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
+    inputs.addStringValueInput('output_folder', 'Output folder:', default_dir)
 
-    file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Design Export Types',
+    file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Design export types',
                                                       adsk.core.DropDownStyles.CheckBoxDropDownStyle)
     file_types_list = file_types_input.listItems
     file_types_list.add('IGES', False)
@@ -83,7 +83,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     file_types_list.add('STL', False)
 
     # Only offered when this version of Fusion supports exporting drawings
-    drawing_types_input = inputs.addDropDownCommandInput('drawing_types_input', 'Drawing Export Types',
+    drawing_types_input = inputs.addDropDownCommandInput('drawing_types_input', 'Drawing export types',
                                                          adsk.core.DropDownStyles.CheckBoxDropDownStyle)
     drawing_types_list = drawing_types_input.listItems
     drawing_types_list.add('PDF', True)
@@ -91,11 +91,11 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     drawing_types_list.add('DWG', False)
     drawing_types_input.isVisible = archiverUtils.HAS_DRAWING
 
-    name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File Name Option',
+    name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File name option',
                                                        adsk.core.DropDownStyles.TextListDropDownStyle)
-    name_option_input.listItems.add('Document Name', True)
+    name_option_input.listItems.add('Document name', True)
     name_option_input.listItems.add('Description', False)
-    name_option_input.listItems.add('Part Number', False)
+    name_option_input.listItems.add('Part number', False)
     name_option_input.isVisible = True
 
     preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
@@ -109,7 +109,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
     version_input.isVisible = False
 
-    update_name_inputs(inputs, 'Document Name')
+    update_name_inputs(inputs, 'Document name')
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
@@ -180,7 +180,7 @@ def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
 def update_name_inputs(command_inputs: adsk.core.CommandInputs, selection: str):
     command_inputs.itemById('write_version').isVisible = False
 
-    if selection == 'Document Name':
+    if selection == 'Document name':
         command_inputs.itemById('write_version').isVisible = True
 
 
