@@ -85,7 +85,7 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     existing_files_input = advanced_inputs.addDropDownCommandInput('existing_files', 'Existing files',
                                                                    adsk.core.DropDownStyles.TextListDropDownStyle)
     for option in export_utils.EXISTING_FILES_OPTIONS:
-        existing_files_input.listItems.add(option, option == export_utils.EXISTING_FILES_RENAME)
+        existing_files_input.listItems.add(option, option == export_utils.EXISTING_FILES_SKIP)
     existing_files_input.tooltip = 'What to do when a file with the same name is already in the output folder'
 
     skip_used_input = advanced_inputs.addBoolValueInput('skip_used_designs', 'Skip designs used by other designs?',
