@@ -39,6 +39,9 @@ USED_DESIGNS_SKIPPED = []
 # Set to (files done, files to export) when the user cancels an export
 export_cancelled = None
 
+# True when the user said no to the confirmation of an all-versions export
+export_declined = False
+
 # Paths written for the file currently being exported, for the log
 current_exports = []
 FAILED_FILES = []
@@ -60,6 +63,9 @@ skip_used_designs = False
 
 # When True, hidden bodies and components are shown before exporting to formats other than F3D
 include_hidden = False
+
+# When True, every version of each design and drawing is exported, not only the latest
+export_all_versions = False
 
 # True from the end of an export until Close All has finished cleaning up after it
 EXPORT_CLEANUP_PENDING = False
@@ -124,15 +130,16 @@ def clear_export_messages():
     EXISTING_FILES_SKIPPED.clear()
     USED_DESIGNS_SKIPPED.clear()
 
-    global export_cancelled
+    global export_cancelled, export_declined
     export_cancelled = None
+    export_declined = False
     FAILED_FILES.clear()
     ELECTRONICS_ERRORS.clear()
 
 
 def export_project(output_folder, file_types, drawing_types, write_version, name_option, folder_preserve,
                    export_electronics, existing_files_option=EXISTING_FILES_RENAME, skip_used_designs_option=False,
-                   include_hidden_option=False, data_folder=None):
+                   include_hidden_option=False, data_folder=None, all_versions_option=False):
     """Export every document in the active project, or in data_folder and its subfolders.
 
     With folder_preserve, a folder's files go under its path in the project, where an export of
@@ -143,10 +150,15 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
     root_folder = data_folder or get_active_project().rootFolder
     folder_path = get_folder_path(root_folder)
 
-    global existing_files, skip_used_designs, include_hidden
+    global existing_files, skip_used_designs, include_hidden, export_all_versions
     existing_files = existing_files_option
     skip_used_designs = skip_used_designs_option
     include_hidden = include_hidden_option
+    export_all_versions = all_versions_option
+
+    # Versions of a design would otherwise export to the same file name
+    if export_all_versions:
+        write_version = True
 
     # Make sure we have a folder not a file
     if not output_folder.endswith(os.path.sep):
@@ -177,6 +189,7 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
         'Existing files: {}'.format(existing_files),
         'Skip designs used by other designs: {}'.format('yes' if skip_used_designs else 'no'),
         'Include hidden bodies and components: {}'.format('yes' if include_hidden else 'no'),
+        'Export all versions: {}'.format('yes' if export_all_versions else 'no'),
     ])
 
     export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
@@ -207,6 +220,9 @@ def show_export_summary():
 def get_summary_messages():
     """Return the messages that summarize what wasn't exported."""
     messages = []
+
+    if export_declined:
+        messages.append("The export was cancelled before any files were exported.")
 
     if export_cancelled:
         messages.append("The export was cancelled after {} of {} files. Run it again with Existing files set to "
@@ -257,6 +273,12 @@ def export_folder(root_folder, output_folder, file_types, drawing_types, write_v
     if not exports:
         return
 
+    if export_all_versions and not confirm_all_versions(exports, file_types, drawing_types):
+        global export_declined
+        export_declined = True
+        log('Cancelled before exporting: {} versions to export'.format(len(exports)))
+        return
+
     # Updating the progress dialog after each file is enough for Fusion to handle its Cancel button
     progress = ui.createProgressDialog()
     progress.isCancelButtonShown = True
@@ -288,6 +310,41 @@ def export_folder(root_folder, output_folder, file_types, drawing_types, write_v
         progress.hide()
 
 
+def confirm_all_versions(exports, file_types, drawing_types):
+    """Ask the user to confirm an all-versions export, showing how many files it will write."""
+    documents = len({data_file.id for _, data_file, _ in exports})
+    design_types = len(selected_type_names(file_types))
+    drawing_type_count = len(selected_type_names(drawing_types))
+
+    files = 0
+    for export_function, data_file, _ in exports:
+        if export_function == export_data_file:
+            files += design_types
+        elif export_function == export_drawing_file:
+            files += drawing_type_count
+        else:
+            files += 1
+
+    result = ui.messageBox(
+        'This will export {} versions of {} documents, about {} files.\n\n'
+        'Exporting every version can take much longer than exporting only the latest versions. '
+        'Continue?'.format(len(exports), documents, files),
+        'Export all versions',
+        adsk.core.MessageBoxButtonTypes.YesNoButtonType,
+        adsk.core.MessageBoxIconTypes.QuestionIconType
+    )
+    return result == adsk.core.DialogResults.DialogYes
+
+
+def get_versions(data_file):
+    """Return the data files to export: every version with Export all versions, otherwise the latest."""
+    if not export_all_versions:
+        return [data_file]
+
+    versions = data_file.versions
+    return sorted((versions.item(i) for i in range(versions.count)), key=lambda version: version.versionNumber)
+
+
 def collect_exports(root_folder, output_folder, file_types, drawing_types, folder_preserve, export_electronics):
     """List the files to export in a folder and its subfolders, without opening any of them.
 
@@ -311,10 +368,10 @@ def collect_exports(root_folder, output_folder, file_types, drawing_types, folde
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d" and any_type_selected(file_types):
-            exports.append((export_data_file, file, output_folder))
+            exports += [(export_data_file, version, output_folder) for version in get_versions(file)]
 
         elif HAS_DRAWING and file.fileExtension == "f2d" and any_type_selected(drawing_types):
-            exports.append((export_drawing_file, file, output_folder))
+            exports += [(export_drawing_file, version, output_folder) for version in get_versions(file)]
 
         elif HAS_ELECTRON and export_electronics and file.fileExtension in ELECTRONICS_EXTENSIONS:
             # Only open Fusion-native electronics documents (fsch/fbrd/flbr).
@@ -772,7 +829,7 @@ def get_folder_path(data_folder):
 
 def get_project_path(data_file):
     """Return a data file's path within its project, such as "Folder/Subfolder/Design"."""
-    names = [data_file.name]
+    names = [data_file.name + (' v{}'.format(data_file.versionNumber) if export_all_versions else '')]
     folder = data_file.parentFolder
     while folder is not None and folder.parentFolder is not None:
         names.insert(0, folder.name)
@@ -894,6 +951,10 @@ def get_name(write_version, option):
 
     output_name = sanitize_name(output_name)
     if not output_name:
-        output_name = get_document_name(write_version)
+        return get_document_name(write_version)
+
+    # Versions of a design would otherwise export to the same file name
+    if export_all_versions:
+        output_name += ' v{}'.format(app.activeDocument.dataFile.versionNumber)
 
     return output_name

@@ -75,6 +75,10 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
                                                       False)
     version_input.isVisible = False
 
+    all_versions_input = advanced_inputs.addBoolValueInput('all_versions', 'Export all versions?', True, '', False)
+    all_versions_input.tooltip = ('Export every version of each design and drawing, not only the latest. '
+                                  'Output file names always include the version.')
+
     preserve_input = advanced_inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '',
                                                        True)
     preserve_input.isVisible = True
@@ -120,6 +124,7 @@ def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolde
     skip_used_input: adsk.core.BoolValueCommandInput = inputs.itemById('skip_used_designs')
     text_commands_input: adsk.core.BoolValueCommandInput = inputs.itemById('open_text_commands')
     hidden_input: adsk.core.BoolValueCommandInput = inputs.itemById('include_hidden')
+    all_versions_input: adsk.core.BoolValueCommandInput = inputs.itemById('all_versions')
 
     if text_commands_input.value:
         text_commands = ui.palettes.itemById('TextCommands')
@@ -137,7 +142,8 @@ def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolde
         existing_files_input.selectedItem.name,
         skip_used_input.value,
         hidden_input.value,
-        data_folder
+        data_folder,
+        all_versions_input.value
     )
 
     close_command = ui.commandDefinitions.itemById(config.close_all_cmd_id)
@@ -146,8 +152,11 @@ def run_export(inputs: adsk.core.CommandInputs, data_folder: adsk.core.DataFolde
 
 def handle_input_changed(changed_input: adsk.core.CommandInput, inputs: adsk.core.CommandInputs):
     """Update the dialog when one of its inputs changes."""
-    if changed_input.id == 'name_option_id':
-        name_option_input: adsk.core.DropDownCommandInput = changed_input
+    # For an input inside a group, inputs only holds the group's inputs, so use the whole dialog's
+    inputs = changed_input.parentCommand.commandInputs
+
+    if changed_input.id in ('name_option_id', 'all_versions'):
+        name_option_input: adsk.core.DropDownCommandInput = inputs.itemById('name_option_id')
         update_name_inputs(inputs, name_option_input.selectedItem.name)
 
     elif changed_input.id == 'browse_output_folder':
@@ -190,8 +199,16 @@ def browse_for_folder(current_folder: str) -> str:
 
 
 def update_name_inputs(command_inputs: adsk.core.CommandInputs, selection: str):
-    """Only show the write version option when naming files by document name."""
-    command_inputs.itemById('write_version').isVisible = False
+    """Show the write version option when naming files by document name or exporting all versions.
 
-    if selection == 'Document name':
-        command_inputs.itemById('write_version').isVisible = True
+    Exporting all versions always writes versions to the file names, so the option is turned on
+    and can't be changed.
+    """
+    version_input: adsk.core.BoolValueCommandInput = command_inputs.itemById('write_version')
+    all_versions_input: adsk.core.BoolValueCommandInput = command_inputs.itemById('all_versions')
+    all_versions = all_versions_input is not None and all_versions_input.value
+
+    version_input.isVisible = selection == 'Document name' or all_versions
+    version_input.isEnabled = not all_versions
+    if all_versions:
+        version_input.value = True
