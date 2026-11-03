@@ -2,6 +2,7 @@
 #  :license: Apache2, see LICENSE for more details.
 
 import os
+import re
 
 import adsk.core
 import adsk.fusion
@@ -587,14 +588,15 @@ def all_exports_exist(data_file, folder, extensions, write_version):
 def get_document_name(write_version):
     """Derive an output name from the active document's name.
 
-    The trailing version suffix (e.g. " v3") is removed unless write_version is set.
+    Current Fusion versions don't include the version in the document name, so it's added
+    from the data file when write_version is set. A trailing version suffix (e.g. " v3")
+    that older Fusion versions included in the name is removed first.
     """
-    doc_name = app.activeDocument.name
+    document = app.activeDocument
+    doc_name = re.sub(r' v\d+$', '', document.name)
 
-    if not write_version:
-        version_index = doc_name.rfind(' v')
-        if version_index != -1:
-            doc_name = doc_name[:version_index]
+    if write_version and document.dataFile is not None:
+        doc_name += ' v{}'.format(document.dataFile.versionNumber)
 
     return sanitize_name(doc_name)
 
