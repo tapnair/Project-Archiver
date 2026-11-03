@@ -133,24 +133,31 @@ def close_documents_pass(keep_version_ids=frozenset()) -> bool:
     A document can't close while another loaded document references it, so the caller repeats
     passes, letting Fusion finish each one, until a pass closes nothing. Unsaved documents are
     never closed.
+
+    While documents are closing, even reading app.documents can raise an InternalValidationError
+    for a moment. That pass is reported as having closed something, so the caller tries again.
     """
+    try:
+        documents = [app.documents.item(i) for i in range(app.documents.count)]
+    except RuntimeError:
+        return True
+
     closed_any = False
-
-    for document in [app.documents.item(i) for i in range(app.documents.count)]:
-        if not document.isValid:
-            continue
-
-        version_id = get_version_id(document)
-        if version_id is None or version_id in keep_version_ids:
-            continue
-
-        count = app.documents.count
+    for document in documents:
         try:
-            closed = document.close(False)
-        except RuntimeError:
-            closed = False
+            if not document.isValid:
+                continue
 
-        if closed or app.documents.count < count:
+            version_id = get_version_id(document)
+            if version_id is None or version_id in keep_version_ids:
+                continue
+
+            count = app.documents.count
+            closed = document.close(False)
+            if closed or app.documents.count < count:
+                closed_any = True
+
+        except RuntimeError:
             closed_any = True
 
     return closed_any
