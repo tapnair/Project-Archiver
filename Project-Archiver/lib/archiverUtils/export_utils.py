@@ -192,8 +192,11 @@ def get_summary_messages():
 
     if len(SKIPPED_FILES) > 0:
         messages.append(
-            "The following files contained external references and could not be exported as f3d's: {}".format(
-                SKIPPED_FILES
+            "These designs reference other designs, so they weren't exported as F3D:\n{}\n\n"
+            "An F3D of a design like this only links to the referenced designs and can't be opened on its own. "
+            "The other export types were still exported, and each referenced design gets its own F3D. "
+            "To keep a design with everything it references, open it and use File > Export to save an F3Z.".format(
+                "\n".join(SKIPPED_FILES)
             )
         )
 
@@ -517,7 +520,8 @@ def export_active_doc(folder, file_types, output_name):
         # where document.allDocumentReferences raises an error
         if document.dataFile.hasChildReferences:
             SKIPPED_FILES.append(document.name)
-            log('Not exported as F3D: {} (has external references)'.format(get_project_path(document.dataFile)))
+            log('Not exported as F3D: {} (references other designs; use File > Export in Fusion to save an F3Z)'
+                .format(get_project_path(document.dataFile)))
 
         else:
             export_name = get_export_path(folder + output_name + '.f3d')
