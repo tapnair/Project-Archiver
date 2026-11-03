@@ -27,6 +27,7 @@ except ImportError:
     HAS_DRAWING = False
 
 from .file_utils import dup_check, sanitize_name
+from .log_utils import LOG_FILE_NAME, start_log, end_log, log
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -34,6 +35,9 @@ ui = app.userInterface
 SKIPPED_FILES = []
 EXISTING_FILES_SKIPPED = []
 USED_DESIGNS_SKIPPED = []
+
+# Paths written for the file currently being exported, for the log
+current_exports = []
 FAILED_FILES = []
 ELECTRONICS_ERRORS = []
 
@@ -67,6 +71,9 @@ ELECTRONICS_EXPORTS = {
 # produced on export. An electronics design (fprj) is skipped: its schematic and
 # board are separate fsch and fbrd files that are exported on their own.
 ELECTRONICS_EXTENSIONS = {'fsch': '.sch', 'fbrd': '.brd', 'flbr': '.lbr'}
+
+# Data panel file extensions this add-in can export
+EXPORTED_EXTENSIONS = {'f3d', 'f2d'} | set(ELECTRONICS_EXTENSIONS)
 
 # Design export type name -> file extension
 DESIGN_EXTENSIONS = {'IGES': '.igs', 'STEP': '.step', 'SAT': '.sat', 'SMT': '.smt', 'F3D': '.f3d', 'STL': '.stl'}
@@ -132,8 +139,22 @@ def export_project(output_folder, file_types, drawing_types, write_version, name
         OPEN_BEFORE_EXPORT.add(get_data_file_id(app.documents.item(i)))
     OPEN_BEFORE_EXPORT.discard(None)
 
+    start_log(output_folder, [
+        'Project: {}'.format(get_active_project().name),
+        'Output folder: {}'.format(output_folder),
+        'Design export types: {}'.format(', '.join(selected_type_names(file_types)) or 'none'),
+        'Drawing export types: {}'.format(', '.join(selected_type_names(drawing_types)) or 'none'),
+        'Export electronics documents: {}'.format('yes' if HAS_ELECTRON and export_electronics else 'no'),
+        'File name option: {}{}'.format(name_option, ', with versions' if write_version else ''),
+        'Preserve folder structure: {}'.format('yes' if folder_preserve else 'no'),
+        'Existing files: {}'.format(existing_files),
+        'Skip designs used by other designs: {}'.format('yes' if skip_used_designs else 'no'),
+    ])
+
     export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
                   folder_preserve, export_electronics)
+
+    end_log(get_summary_messages() or ['Every file was exported.'])
 
     global EXPORT_CLEANUP_PENDING
     EXPORT_CLEANUP_PENDING = True
@@ -145,6 +166,18 @@ def show_export_summary():
     Showing a message box while the exported documents are still open can fail with
     "failed to find product", so this is called after they have been closed.
     """
+    messages = get_summary_messages()
+    if messages:
+        messages.append('Details for every file are in {} in the output folder.'.format(LOG_FILE_NAME))
+
+    clear_export_messages()
+
+    for message in messages:
+        ui.messageBox(message)
+
+
+def get_summary_messages():
+    """Return the messages that summarize what wasn't exported."""
     messages = []
 
     if len(USED_DESIGNS_SKIPPED) > 0:
@@ -178,10 +211,7 @@ def show_export_summary():
             )
         )
 
-    clear_export_messages()
-
-    for message in messages:
-        ui.messageBox(message)
+    return messages
 
 
 def export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
@@ -212,6 +242,12 @@ def export_folder(root_folder, output_folder, file_types, drawing_types, write_v
             # data on them raises Fusion's "failed to find product" error.
             export_electronics_file(file, output_folder, write_version)
 
+        elif file.fileExtension in EXPORTED_EXTENSIONS:
+            log('Not exported: {} (export type not selected)'.format(get_project_path(file)))
+
+        else:
+            log('Not exported: {} (.{} files aren\'t exported)'.format(get_project_path(file), file.fileExtension))
+
 
 def export_data_file(data_file, output_folder, file_types, write_version, name_option):
     """Open a design, export it, and close it again so memory doesn't grow with the size of the project.
@@ -220,6 +256,8 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
     """
     if skip_used_designs and is_used_by_other_designs(data_file):
         USED_DESIGNS_SKIPPED.append(data_file.name)
+        parents = [parent.name for parent in data_file.parentReferences if parent.fileExtension == 'f3d']
+        log('Skipped: {} (used by {})'.format(get_project_path(data_file), ', '.join(parents)))
         return
 
     # The document name is known without opening the design, so existing files can be skipped early
@@ -233,15 +271,17 @@ def export_data_file(data_file, output_folder, file_types, write_version, name_o
     document = open_doc(data_file)
 
     if document is None:
-        FAILED_FILES.append("{}: could not be opened".format(data_file.name))
+        record_failure(FAILED_FILES, data_file, 'could not be opened')
         return
 
+    current_exports.clear()
     try:
         output_name = get_name(write_version, name_option)
         export_active_doc(output_folder, file_types, output_name)
+        log_exports(data_file)
 
     except Exception as e:
-        FAILED_FILES.append("{}: {}".format(data_file.name, str(e)))
+        record_failure(FAILED_FILES, data_file, str(e))
 
     finally:
         close_doc(document)
@@ -257,16 +297,18 @@ def export_drawing_file(data_file, output_folder, drawing_types, write_version):
     document = open_doc(data_file)
 
     if document is None:
-        FAILED_FILES.append("{}: could not be opened".format(data_file.name))
+        record_failure(FAILED_FILES, data_file, 'could not be opened')
         return
 
+    current_exports.clear()
     try:
         # Drawings don't have a description or part number, so always use the document name
         output_name = get_document_name(write_version)
         export_drawing_doc(document, output_folder, drawing_types, output_name)
+        log_exports(data_file)
 
     except Exception as e:
-        FAILED_FILES.append("{}: {}".format(data_file.name, str(e)))
+        record_failure(FAILED_FILES, data_file, str(e))
 
     finally:
         close_doc(document)
@@ -285,7 +327,8 @@ def export_drawing_doc(document, folder, drawing_types, output_name):
             continue
 
         if not hasattr(export_mgr, factory_name):
-            FAILED_FILES.append("{}: {} export not available in this Fusion version".format(output_name, type_name))
+            record_format_failure(FAILED_FILES, "{}: {} export not available in this Fusion version".format(
+                output_name, type_name))
             continue
 
         try:
@@ -298,10 +341,11 @@ def export_drawing_doc(document, folder, drawing_types, output_name):
                 export_options.openPDF = False
 
             if not export_mgr.execute(export_options):
-                FAILED_FILES.append("{}: {} export failed".format(output_name, type_name))
+                record_format_failure(FAILED_FILES, "{}: {} export failed".format(output_name, type_name),
+                                      export_name)
 
         except Exception as e:
-            FAILED_FILES.append("{}: {} export error: {}".format(output_name, type_name, str(e)))
+            record_format_failure(FAILED_FILES, "{}: {} export error: {}".format(output_name, type_name, str(e)))
 
 
 def export_electronics_file(data_file, output_folder, write_version):
@@ -312,17 +356,19 @@ def export_electronics_file(data_file, output_folder, write_version):
     document = open_doc(data_file)
 
     if document is None:
-        ELECTRONICS_ERRORS.append("{}: could not be opened".format(data_file.name))
+        record_failure(ELECTRONICS_ERRORS, data_file, 'could not be opened')
         return
 
+    current_exports.clear()
     try:
         # Electronics docs are not design products, so the root_comp
         # based name options in get_name would fail. Use the document
         # name directly (optionally stripped of its version suffix).
         output_name = get_document_name(write_version)
         export_electronics_doc(output_folder, output_name)
+        log_exports(data_file)
     except Exception as e:
-        ELECTRONICS_ERRORS.append("{}: {}".format(data_file.name, str(e)))
+        record_failure(ELECTRONICS_ERRORS, data_file, str(e))
 
     finally:
         close_doc(document)
@@ -469,6 +515,7 @@ def export_active_doc(folder, file_types, output_name):
 
         if document.allDocumentReferences.count > 0:
             SKIPPED_FILES.append(document.name)
+            log('Not exported as F3D: {} (has external references)'.format(get_project_path(document.dataFile)))
 
         else:
             export_name = get_export_path(folder + output_name + '.f3d')
@@ -501,9 +548,8 @@ def _export_one_electronics_format(product, type_name, folder, output_name):
         # The factory only exists on supported/preview builds. If it's missing,
         # skip quietly with a collected note instead of raising.
         if export_mgr is None or not hasattr(export_mgr, factory_name):
-            ELECTRONICS_ERRORS.append(
-                "{}: {} export not available in this Fusion version".format(output_name, type_name)
-            )
+            record_format_failure(ELECTRONICS_ERRORS, "{}: {} export not available in this Fusion version".format(
+                output_name, type_name))
             return
 
         export_name = get_export_path(folder + output_name + extension)
@@ -514,16 +560,16 @@ def _export_one_electronics_format(product, type_name, folder, output_name):
 
         # A None result means the factory was called on the wrong product type.
         if export_options is None:
-            ELECTRONICS_ERRORS.append(
-                "{}: {} export options could not be created".format(output_name, type_name)
-            )
+            record_format_failure(ELECTRONICS_ERRORS, "{}: {} export options could not be created".format(
+                output_name, type_name), export_name)
             return
 
         if not export_mgr.execute(export_options):
-            ELECTRONICS_ERRORS.append("{}: {} export failed".format(output_name, type_name))
+            record_format_failure(ELECTRONICS_ERRORS, "{}: {} export failed".format(output_name, type_name),
+                                  export_name)
 
     except Exception as e:
-        ELECTRONICS_ERRORS.append("{}: {} export error: {}".format(output_name, type_name, str(e)))
+        record_format_failure(ELECTRONICS_ERRORS, "{}: {} export error: {}".format(output_name, type_name, str(e)))
 
 
 def export_electronics_doc(folder, output_name):
@@ -564,6 +610,42 @@ def export_electronics_doc(folder, output_name):
         _export_one_electronics_format(library, 'LBR', folder, output_name)
 
 
+def get_project_path(data_file):
+    """Return a data file's path within its project, such as "Folder/Subfolder/Design"."""
+    names = [data_file.name]
+    folder = data_file.parentFolder
+    while folder is not None and folder.parentFolder is not None:
+        names.insert(0, folder.name)
+        folder = folder.parentFolder
+    return '/'.join(names)
+
+
+def log_exports(data_file):
+    """Log the files written for a data file."""
+    if current_exports:
+        log('Exported: {} -> {}'.format(get_project_path(data_file),
+                                         ', '.join(os.path.basename(path) for path in current_exports)))
+
+
+def record_failure(failures, data_file, reason):
+    """Record a file that couldn't be exported for the summary and the log."""
+    failures.append("{}: {}".format(data_file.name, reason))
+    log('Failed: {}: {}'.format(get_project_path(data_file), reason))
+
+
+def record_format_failure(failures, message, export_path=None):
+    """Record one export type of a file that failed, for the summary and the log."""
+    failures.append(message)
+    log('Failed: {}'.format(message))
+    if export_path in current_exports:
+        current_exports.remove(export_path)
+
+
+def selected_type_names(file_types):
+    """Return the names of the export types checked in a dropdown."""
+    return [file_types.item(i).name for i in range(file_types.count) if file_types.item(i).isSelected]
+
+
 def is_used_by_other_designs(data_file):
     """Return True if a design is inserted into another design, which is known without opening it.
 
@@ -578,17 +660,22 @@ def is_used_by_other_designs(data_file):
 def get_export_path(path):
     """Return the path to export to, or None to skip it, based on the Existing files option."""
     if not os.path.exists(path):
+        current_exports.append(path)
         return path
 
     if existing_files == EXISTING_FILES_SKIP:
         EXISTING_FILES_SKIPPED.append(path)
+        log('Skipped: {} (already exists)'.format(os.path.basename(path)))
         return None
 
     if existing_files == EXISTING_FILES_OVERWRITE:
         os.remove(path)
+        current_exports.append(path)
         return path
 
-    return dup_check(path)
+    path = dup_check(path)
+    current_exports.append(path)
+    return path
 
 
 def all_exports_exist(data_file, folder, extensions, write_version):
@@ -606,6 +693,7 @@ def all_exports_exist(data_file, folder, extensions, write_version):
     paths = [folder + sanitize_name(name) + extension for extension in extensions]
     if all(os.path.exists(path) for path in paths):
         EXISTING_FILES_SKIPPED.extend(paths)
+        log('Skipped: {} (already exported)'.format(get_project_path(data_file)))
         return True
 
     return False

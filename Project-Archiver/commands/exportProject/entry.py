@@ -139,6 +139,12 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     skip_used_input.tooltip = ('Only export designs that aren\'t inserted into another design, '
                                'such as top-level assemblies')
 
+    text_commands_input = advanced_inputs.addBoolValueInput('open_text_commands', 'Open Text Commands?', True, '',
+                                                            False)
+    text_commands_input.tooltip = ('Open the Text Commands window to see each file as it\'s exported. '
+                                   'The same details are written to {} in the output folder.'
+                                   .format(archiverUtils.LOG_FILE_NAME))
+
     update_name_inputs(inputs, 'Document name')
 
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
@@ -163,6 +169,12 @@ def command_execute(args: adsk.core.CommandEventArgs):
     electronics_input: adsk.core.BoolValueCommandInput = inputs.itemById('export_electronics')
     existing_files_input: adsk.core.DropDownCommandInput = inputs.itemById('existing_files')
     skip_used_input: adsk.core.BoolValueCommandInput = inputs.itemById('skip_used_designs')
+    text_commands_input: adsk.core.BoolValueCommandInput = inputs.itemById('open_text_commands')
+
+    if text_commands_input.value:
+        text_commands = ui.palettes.itemById('TextCommands')
+        if text_commands:
+            text_commands.isVisible = True
 
     archiverUtils.export_project(
         output_folder_input.value,
