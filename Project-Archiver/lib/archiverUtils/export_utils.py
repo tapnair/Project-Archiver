@@ -36,6 +36,9 @@ SKIPPED_FILES = []
 EXISTING_FILES_SKIPPED = []
 USED_DESIGNS_SKIPPED = []
 
+# Set to (files done, files to export) when the user cancels an export
+export_cancelled = None
+
 # Paths written for the file currently being exported, for the log
 current_exports = []
 FAILED_FILES = []
@@ -120,6 +123,9 @@ def clear_export_messages():
     SKIPPED_FILES.clear()
     EXISTING_FILES_SKIPPED.clear()
     USED_DESIGNS_SKIPPED.clear()
+
+    global export_cancelled
+    export_cancelled = None
     FAILED_FILES.clear()
     ELECTRONICS_ERRORS.clear()
 
@@ -202,6 +208,10 @@ def get_summary_messages():
     """Return the messages that summarize what wasn't exported."""
     messages = []
 
+    if export_cancelled:
+        messages.append("The export was cancelled after {} of {} files. Run it again with Existing files set to "
+                        "Skip existing files to continue where it stopped.".format(*export_cancelled))
+
     if len(USED_DESIGNS_SKIPPED) > 0:
         messages.append(
             "{} designs used by other designs were skipped.".format(len(USED_DESIGNS_SKIPPED))
@@ -241,6 +251,51 @@ def get_summary_messages():
 
 def export_folder(root_folder, output_folder, file_types, drawing_types, write_version, name_option,
                   folder_preserve, export_electronics):
+    """Export every document in a folder and its subfolders, showing progress with a Cancel button."""
+    exports = collect_exports(root_folder, output_folder, file_types, drawing_types, folder_preserve,
+                              export_electronics)
+    if not exports:
+        return
+
+    # Updating the progress dialog after each file is enough for Fusion to handle its Cancel button
+    progress = ui.createProgressDialog()
+    progress.isCancelButtonShown = True
+    progress.cancelButtonText = 'Cancel'
+    progress.show('Project Archiver', 'Exporting %v of %m', 0, len(exports))
+
+    global export_cancelled
+    try:
+        for index, (export_function, data_file, folder) in enumerate(exports):
+            if progress.wasCancelled:
+                export_cancelled = (index, len(exports))
+                log('Cancelled after {} of {} files'.format(index, len(exports)))
+                break
+
+            progress.message = 'Exporting %v of %m: {}'.format(get_project_path(data_file))
+            progress.progressValue = index
+
+            if export_function == export_data_file:
+                export_data_file(data_file, folder, file_types, write_version, name_option)
+            elif export_function == export_drawing_file:
+                export_drawing_file(data_file, folder, drawing_types, write_version)
+            else:
+                export_electronics_file(data_file, folder, write_version)
+
+        else:
+            progress.progressValue = len(exports)
+
+    finally:
+        progress.hide()
+
+
+def collect_exports(root_folder, output_folder, file_types, drawing_types, folder_preserve, export_electronics):
+    """List the files to export in a folder and its subfolders, without opening any of them.
+
+    Returns (export function, data file, output folder) for each file, so the total is known for
+    the progress dialog. Creates the output folders and logs the files that aren't exported.
+    """
+    exports = []
+
     for folder in root_folder.dataFolders:
 
         if folder_preserve:
@@ -251,27 +306,29 @@ def export_folder(root_folder, output_folder, file_types, drawing_types, write_v
         else:
             new_folder = output_folder
 
-        export_folder(folder, new_folder, file_types, drawing_types, write_version, name_option,
-                      folder_preserve, export_electronics)
+        exports += collect_exports(folder, new_folder, file_types, drawing_types, folder_preserve,
+                                   export_electronics)
 
     for file in root_folder.dataFiles:
         if file.fileExtension == "f3d" and any_type_selected(file_types):
-            export_data_file(file, output_folder, file_types, write_version, name_option)
+            exports.append((export_data_file, file, output_folder))
 
         elif HAS_DRAWING and file.fileExtension == "f2d" and any_type_selected(drawing_types):
-            export_drawing_file(file, output_folder, drawing_types, write_version)
+            exports.append((export_drawing_file, file, output_folder))
 
         elif HAS_ELECTRON and export_electronics and file.fileExtension in ELECTRONICS_EXTENSIONS:
             # Only open Fusion-native electronics documents (fsch/fbrd/flbr).
             # Opening unrelated hub files (drawings, etc.) and reading product
             # data on them raises Fusion's "failed to find product" error.
-            export_electronics_file(file, output_folder, write_version)
+            exports.append((export_electronics_file, file, output_folder))
 
         elif file.fileExtension in EXPORTED_EXTENSIONS:
             log('Not exported: {} (export type not selected)'.format(get_project_path(file)))
 
         else:
             log('Not exported: {} (.{} files aren\'t exported)'.format(get_project_path(file), file.fileExtension))
+
+    return exports
 
 
 def export_data_file(data_file, output_folder, file_types, write_version, name_option):
