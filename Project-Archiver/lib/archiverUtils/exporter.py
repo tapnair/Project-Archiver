@@ -724,8 +724,8 @@ def show_progress(total, value):
 
 
 def plural(count, noun):
-    """Return "1 file" or "3 files"."""
-    return '{} {}{}'.format(count, noun, '' if count == 1 else 's')
+    """Return "1 file", "3 files" or "1,240 files"."""
+    return '{:,} {}{}'.format(count, noun, '' if count == 1 else 's')
 
 
 def list_lines(items, max_listed=None):
