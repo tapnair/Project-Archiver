@@ -83,6 +83,10 @@ class Exporter:
         # Paths written for the file currently being exported, for the log
         self.current_exports = []
 
+        # The workspace Fusion switched to when the current file was opened, to tell a
+        # workspace switch from the user clicking Cancel
+        self.opened_in_workspace = None
+
     # ----------------------------------------------------------------------------------------
     # Running the export
     # ----------------------------------------------------------------------------------------
@@ -199,23 +203,30 @@ class Exporter:
 
     def export_with_progress(self, exports):
         """Export each file, showing progress with a Cancel button that stops before the next file."""
-        # Updating the progress dialog after each file is enough for Fusion to handle its
-        # Cancel button while the export runs; no adsk.doEvents() call is needed.
-        progress = ui.createProgressDialog()
-        progress.isCancelButtonShown = True
-        progress.cancelButtonText = 'Cancel'
-        progress.show('Project Archiver', 'Exporting %v of %m', 0, len(exports))
+        progress = show_progress(len(exports), 0)
+        workspace_changed = False
 
         try:
             for index, (export_method, data_file, output_folder) in enumerate(exports):
                 if progress.wasCancelled:
-                    self.results.cancelled = (index, len(exports))
-                    log('Cancelled after {} of {} files'.format(index, len(exports)))
-                    break
+                    # Opening some documents, such as electronics documents, switches Fusion to another
+                    # workspace, which closes the progress dialog and reports it as cancelled. Only a
+                    # cancel without a workspace change came from the user.
+                    if not workspace_changed:
+                        self.results.cancelled = (index, len(exports))
+                        log('Cancelled after {} of {} files'.format(index, len(exports)))
+                        break
+
+                    progress.hide()
+                    progress = show_progress(len(exports), index)
 
                 progress.message = 'Exporting %v of %m: {}'.format(self.project_path(data_file))
                 progress.progressValue = index
+
+                workspace = ui.activeWorkspace.id
+                self.opened_in_workspace = workspace
                 export_method(data_file, output_folder)
+                workspace_changed = self.opened_in_workspace != workspace
 
             else:
                 progress.progressValue = len(exports)
@@ -271,6 +282,7 @@ class Exporter:
         Documents the user already had open are left open.
         """
         document = document_utils.open_data_file(data_file)
+        self.opened_in_workspace = ui.activeWorkspace.id
         if document is None:
             self.record_failure(data_file, 'could not be opened')
             return
@@ -547,6 +559,20 @@ class Exporter:
 
         for message in messages:
             ui.messageBox(message)
+
+
+def show_progress(total, value):
+    """Show the export progress dialog with a Cancel button.
+
+    Updating the dialog after each file is enough for Fusion to handle its Cancel button while
+    the export runs; no adsk.doEvents() call is needed.
+    """
+    progress = ui.createProgressDialog()
+    progress.isCancelButtonShown = True
+    progress.cancelButtonText = 'Cancel'
+    progress.show('Project Archiver', 'Exporting %v of %m', 0, total)
+    progress.progressValue = value
+    return progress
 
 
 def strip_version(name):
