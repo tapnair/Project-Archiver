@@ -255,11 +255,19 @@ class Exporter:
             log('Skipped: {} (used by {})'.format(self.project_path(data_file), ', '.join(parents)))
             return
 
+        # An F3D of a design that references other designs only links to them, and Fusion can't
+        # open it on its own. The API can't create an F3Z, so these are skipped for F3D. This is
+        # known without opening the design, so it's recorded even if the design is skipped below.
+        skip_f3d = 'F3D' in options.design_types and data_file.hasChildReferences
+        if skip_f3d:
+            self.results.f3d_skipped.append(self.project_path(data_file))
+            log('Not exported as F3D: {} (references other designs; use File > Export in Fusion to save an F3Z)'
+                .format(self.project_path(data_file)))
+
         # The output name is known without opening the design when it's the document name
         if options.name_option == NAME_DOCUMENT:
             extensions = [extension for type_name, extension in DESIGN_EXTENSIONS.items()
-                          if type_name in options.design_types
-                          and not (type_name == 'F3D' and data_file.hasChildReferences)]
+                          if type_name in options.design_types and not (type_name == 'F3D' and skip_f3d)]
             if self.all_exports_exist(data_file, output_folder, extensions):
                 return
 
@@ -323,19 +331,13 @@ class Exporter:
         export_mgr = design.exportManager
         output_name = self.get_design_name(design)
 
-        if 'F3D' in options.design_types:
-            # An F3D of a design that references other designs only links to them, and Fusion
-            # can't open it on its own. The API can't create an F3Z, so these are skipped.
-            # The data file knows this even when the design was loaded in the background by an
-            # assembly, where document.allDocumentReferences raises an error.
-            if document.dataFile.hasChildReferences:
-                self.results.f3d_skipped.append(self.project_path(document.dataFile))
-                log('Not exported as F3D: {} (references other designs; use File > Export in Fusion to save an F3Z)'
-                    .format(self.project_path(document.dataFile)))
-            else:
-                export_name = self.get_export_path(folder + output_name + DESIGN_EXTENSIONS['F3D'])
-                if export_name is not None:
-                    export_mgr.execute(export_mgr.createFusionArchiveExportOptions(export_name))
+        # Designs that reference other designs aren't exported as F3D; export_design_file records them.
+        # The data file is checked rather than document.allDocumentReferences, which raises an error
+        # when the design was loaded in the background by an assembly.
+        if 'F3D' in options.design_types and not document.dataFile.hasChildReferences:
+            export_name = self.get_export_path(folder + output_name + DESIGN_EXTENSIONS['F3D'])
+            if export_name is not None:
+                export_mgr.execute(export_mgr.createFusionArchiveExportOptions(export_name))
 
         # The other types export the root component, and leave out anything hidden
         create_options = {
