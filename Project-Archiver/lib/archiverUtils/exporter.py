@@ -690,7 +690,7 @@ def get_summary_messages(results: ExportResults, output_folder, max_listed=None)
 
     if results.f3d_skipped:
         messages.append(
-            "These designs reference other designs, so they weren't exported as F3D:\n{}\n"
+            "These designs reference other designs, so they weren't exported as F3D:\n{}\n\n"
             "An F3D of a design like this only links to the referenced designs and can't be opened on its own. "
             "The other export types were still exported, and each referenced design gets its own F3D. "
             "To keep a design with everything it references, open it and use File > Export to save an F3Z.".format(
