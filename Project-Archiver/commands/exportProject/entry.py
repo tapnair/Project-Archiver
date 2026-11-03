@@ -80,6 +80,10 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     inputs.addStringValueInput('output_folder', 'Output folder:', default_dir)
 
+    browse_input = inputs.addBoolValueInput('browse_output_folder', 'Browse', False, '', False)
+    browse_input.text = 'Browse...'
+    browse_input.tooltip = 'Choose the folder to export to'
+
     file_types_input = inputs.addDropDownCommandInput('file_types_input', 'Design export types',
                                                       adsk.core.DropDownStyles.CheckBoxDropDownStyle)
     file_types_list = file_types_input.listItems
@@ -167,6 +171,33 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     if changed_input.id == 'name_option_id':
         name_option_input: adsk.core.DropDownCommandInput = changed_input
         update_name_inputs(inputs, name_option_input.selectedItem.name)
+
+    elif changed_input.id == 'browse_output_folder':
+        output_folder_input: adsk.core.StringValueCommandInput = inputs.itemById('output_folder')
+        folder = browse_for_folder(output_folder_input.value)
+        if folder:
+            output_folder_input.value = os.path.join(folder, '')
+
+
+# Show a folder picker starting at the current output folder, and return the chosen folder or ''.
+def browse_for_folder(current_folder: str) -> str:
+    folder_dialog = ui.createFolderDialog()
+    folder_dialog.title = 'Choose the folder to export to'
+
+    # Start in the current output folder, or the closest parent that exists
+    initial_folder = current_folder
+    while initial_folder and not os.path.isdir(initial_folder):
+        parent = os.path.dirname(initial_folder.rstrip(os.path.sep))
+        if parent == initial_folder:
+            break
+        initial_folder = parent
+    if initial_folder:
+        folder_dialog.initialDirectory = initial_folder
+
+    if folder_dialog.showDialog() == adsk.core.DialogResults.DialogOK:
+        return folder_dialog.folder
+
+    return ''
 
 
 # This event handler is called when the user interacts with any of the inputs in the dialog
