@@ -104,7 +104,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     drawing_types_input.isVisible = archiverUtils.HAS_DRAWING
 
     # Only offered when this version of Fusion supports exporting electronics documents
-    electronics_input = inputs.addBoolValueInput('export_electronics', 'Export electronics documents?', True, '', False)
+    electronics_input = inputs.addBoolValueInput('export_electronics', 'Export electronics documents?', True, '', True)
     electronics_input.tooltip = 'Exports boards, schematics and libraries as EAGLE .brd, .sch and .lbr files'
     electronics_input.isVisible = archiverUtils.HAS_ELECTRON
 
