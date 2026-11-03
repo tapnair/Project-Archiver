@@ -103,6 +103,11 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     drawing_types_list.add('DWG', False)
     drawing_types_input.isVisible = archiverUtils.HAS_DRAWING
 
+    # Only offered when this version of Fusion supports exporting electronics documents
+    electronics_input = inputs.addBoolValueInput('export_electronics', 'Export electronics documents?', True, '', False)
+    electronics_input.tooltip = 'Exports boards, schematics and libraries as EAGLE .brd, .sch and .lbr files'
+    electronics_input.isVisible = archiverUtils.HAS_ELECTRON
+
     name_option_input = inputs.addDropDownCommandInput('name_option_id', 'File name option',
                                                        adsk.core.DropDownStyles.TextListDropDownStyle)
     name_option_input.listItems.add('Document name', True)
@@ -110,16 +115,18 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     name_option_input.listItems.add('Part number', False)
     name_option_input.isVisible = True
 
-    preserve_input = inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '', True)
-    preserve_input.isVisible = True
+    # Options most users don't need to change, collapsed by default
+    advanced_group = inputs.addGroupCommandInput('advanced_options', 'Advanced options')
+    advanced_group.isExpanded = False
+    advanced_inputs = advanced_group.children
 
-    # Only offered when this version of Fusion supports exporting electronics documents
-    electronics_input = inputs.addBoolValueInput('export_electronics', 'Export electronics documents?', True, '', False)
-    electronics_input.tooltip = 'Exports boards, schematics and libraries as EAGLE .brd, .sch and .lbr files'
-    electronics_input.isVisible = archiverUtils.HAS_ELECTRON
-
-    version_input = inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '', False)
+    version_input = advanced_inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True, '',
+                                                      False)
     version_input.isVisible = False
+
+    preserve_input = advanced_inputs.addBoolValueInput('folder_preserve_id', 'Preserve folder structure?', True, '',
+                                                       True)
+    preserve_input.isVisible = True
 
     update_name_inputs(inputs, 'Document name')
 
