@@ -415,16 +415,18 @@ class Exporter:
         view are put back afterward, so nothing the user had open is left changed. The design is never
         saved, and a failure is recorded without stopping the design's other exports.
         """
-        export_name = self.get_export_path(folder + output_name + THUMBNAIL_EXTENSION)
-        if export_name is None:
-            return
-
+        export_name = None
         shown = []
         hidden = []
         viewport = None
         original_camera = None
 
         try:
+            # Preparing the path can fail too, such as removing a file that can't be overwritten
+            export_name = self.get_export_path(folder + output_name + THUMBNAIL_EXTENSION)
+            if export_name is None:
+                return
+
             if ui.activeWorkspace.id != config.DESIGN_WORKSPACE_ID:
                 ui.workspaces.itemById(config.DESIGN_WORKSPACE_ID).activate()
 

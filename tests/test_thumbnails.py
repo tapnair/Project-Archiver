@@ -81,8 +81,27 @@ class FakeBody:
         self.isLightBulbOn = visible
 
 
+class FakeCanvas:
+    def __init__(self, visible=True, locked=False):
+        self._visible = visible
+        self.locked = locked
+
+    @property
+    def isLightBulbOn(self):
+        return self._visible
+
+    @isLightBulbOn.setter
+    def isLightBulbOn(self, value):
+        if self.locked:
+            raise RuntimeError('a canvas in a referenced component can\'t be changed')
+        self._visible = value
+
+
 class FakeComponent:
-    """A component with a Bodies folder, a body, and the folders of non-solid geometry."""
+    """A component with a Bodies folder, a body, the folders of non-solid geometry, and canvases.
+
+    Fusion has no folder property for canvases, so there isn't one here either.
+    """
 
     def __init__(self, bodies_visible=True, body_visible=True):
         self.isBodiesFolderLightBulbOn = bodies_visible
@@ -92,7 +111,7 @@ class FakeComponent:
         self.isOriginFolderLightBulbOn = True
         self.isJointsFolderLightBulbOn = True
         self.isJointOriginsFolderLightBulbOn = True
-        self.isCanvasFolderLightBulbOn = True
+        self.canvases = [FakeCanvas()]
         self.allOccurrences = []
         self.description = ''
         self.partNumber = ''
@@ -138,13 +157,15 @@ class FakeDesign:
         """What is visible right now, for comparing before, during and after."""
         root = self.rootComponent
         state = {'root bodies': root.isBodiesFolderLightBulbOn, 'root body': root.bRepBodies[0].isLightBulbOn}
-        for name in ('Sketch', 'Construction', 'Origin', 'Joints', 'JointOrigins', 'Canvas'):
+        for name in ('Sketch', 'Construction', 'Origin', 'Joints', 'JointOrigins'):
             state[name] = getattr(root, 'is{}FolderLightBulbOn'.format(name))
+        state['Canvas'] = root.canvases[0].isLightBulbOn
         for index, occurrence in enumerate(root.allOccurrences):
             state['occurrence {}'.format(index)] = occurrence.isLightBulbOn
             state['occurrence {} folder'.format(index)] = occurrence.component.isBodiesFolderLightBulbOn
             state['occurrence {} body'.format(index)] = occurrence.bRepBodies[0].isLightBulbOn
             state['occurrence {} sketches'.format(index)] = occurrence.component.isSketchFolderLightBulbOn
+            state['occurrence {} canvas'.format(index)] = occurrence.component.canvases[0].isLightBulbOn
         return state
 
 
@@ -447,10 +468,49 @@ class ThumbnailExportTests(unittest.TestCase):
         during = self.images()[0][3]
         for folder in ('Sketch', 'Construction', 'Origin', 'Joints', 'JointOrigins', 'Canvas'):
             self.assertFalse(during[folder], folder + ' should be hidden in the thumbnail')
+        self.assertFalse(during['occurrence 0 canvas'])
+        self.assertFalse(during['occurrence 1 canvas'])
+        self.assertFalse(hasattr(self.design.rootComponent, 'isCanvasFolderLightBulbOn'),
+                         'canvases are hidden one by one, not through a folder property Fusion doesn\'t have')
         self.assertFalse(during['occurrence 0'])
         self.assertFalse(during['occurrence 1 body'])
         self.assertFalse(during['occurrence 1 folder'])
         self.assertFalse(during['occurrence 1 sketches'])
+
+    def test_only_the_canvases_that_were_visible_are_hidden_and_restored(self):
+        root = self.design.rootComponent
+        root.canvases = [FakeCanvas(visible=True), FakeCanvas(visible=False)]
+        component = self.design.hidden_body.component
+        component.canvases = [FakeCanvas(visible=True)]
+
+        hidden = document_utils.hide_non_solid_geometry(self.design)
+
+        self.assertEqual([root.canvases[0].isLightBulbOn, root.canvases[1].isLightBulbOn], [False, False])
+        self.assertFalse(component.canvases[0].isLightBulbOn)
+        self.assertEqual(sum(1 for entity, _ in hidden if isinstance(entity, FakeCanvas)), 3)
+
+        document_utils.show_again(hidden)
+
+        self.assertEqual([root.canvases[0].isLightBulbOn, root.canvases[1].isLightBulbOn], [True, False],
+                         'the canvas that was already hidden stays hidden')
+        self.assertTrue(component.canvases[0].isLightBulbOn)
+
+    def test_a_canvas_that_cannot_be_changed_is_skipped(self):
+        self.design.rootComponent.canvases = [FakeCanvas(locked=True), FakeCanvas()]
+
+        document_exporter = self.export()
+
+        self.assertEqual(len(self.images()), 1)
+        self.assertFalse(document_exporter.results.failed)
+        self.assertTrue(self.design.rootComponent.canvases[1].isLightBulbOn)
+
+    def test_canvases_are_restored_for_an_already_open_design(self):
+        data_file = make_data_file()
+        fake_app.documents.open(data_file, True)
+
+        self.export(data_file, open_before={data_file.versionId})
+
+        self.assertEqual(self.design.snapshot(), self.original)
 
     def test_unhide_shows_hidden_bodies_and_components_for_the_thumbnail_only(self):
         self.export(unhide_for_thumbnails=True)
@@ -500,6 +560,39 @@ class ThumbnailExportTests(unittest.TestCase):
         self.assertEqual([export[0] for export in self.design.exports], ['STEP'])
         self.assertEqual(document_exporter.results.exported_files, 1)
         self.assertEqual(len(document_exporter.results.failed), 1)
+
+    def test_a_thumbnail_path_that_cannot_be_prepared_is_a_thumbnail_failure_only(self):
+        # A directory with the PNG's name can't be overwritten: os.remove raises an OSError
+        os.makedirs(os.path.join(self.folder, 'Bracket.png'))
+
+        document_exporter = self.export(existing_files=export_options.EXISTING_FILES_OVERWRITE)
+
+        self.assertEqual(self.images(), [], 'no picture is taken when the path can\'t be prepared')
+        self.assertEqual([export[0] for export in self.design.exports], ['STEP'])
+        self.assertEqual(len(document_exporter.results.failed), 1)
+        self.assertIn('thumbnail export error', document_exporter.results.failed[0])
+        self.assertEqual(self.design.snapshot(), self.original)
+        self.assertEqual(fake_app.documents.opened[0].closed_with, [False])
+
+    def test_a_protected_png_is_a_thumbnail_failure_only(self):
+        open(os.path.join(self.folder, 'Bracket.png'), 'wb').close()
+        real_remove = os.remove
+
+        def refuse(path):
+            if path.endswith('.png'):
+                raise PermissionError('protected')
+            real_remove(path)
+
+        os.remove = refuse
+        try:
+            document_exporter = self.export(existing_files=export_options.EXISTING_FILES_OVERWRITE,
+                                            design_types=['STEP', 'F3D'])
+        finally:
+            os.remove = real_remove
+
+        self.assertEqual(sorted(export[0] for export in self.design.exports), ['FusionArchive', 'STEP'])
+        self.assertEqual(len(document_exporter.results.failed), 1)
+        self.assertEqual(document_exporter.results.exported_files, 2)
 
     def test_the_design_is_never_saved_and_exported_documents_are_closed_discarding_changes(self):
         self.export(unhide_for_thumbnails=True)

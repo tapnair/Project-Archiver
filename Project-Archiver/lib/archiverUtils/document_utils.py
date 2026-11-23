@@ -24,9 +24,10 @@ import adsk.fusion
 
 app = adsk.core.Application.get()
 
-# The Component properties that show a folder of non-solid geometry in the browser
+# The Component properties that show a folder of non-solid geometry in the browser. Canvases have no
+# folder property, so each canvas is hidden on its own.
 NON_SOLID_FOLDERS = ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn',
-                     'isJointsFolderLightBulbOn', 'isJointOriginsFolderLightBulbOn', 'isCanvasFolderLightBulbOn')
+                     'isJointsFolderLightBulbOn', 'isJointOriginsFolderLightBulbOn')
 
 # The General preferences that let Fusion save a document by itself
 AUTO_SAVE_PREFERENCES = ('isAutomaticSaveOnCloseEnabled', 'isAutomaticVersioningEnabled')
@@ -256,26 +257,35 @@ def hide_again(shown):
 def hide_non_solid_geometry(design):
     """Hide the sketches, construction geometry, joints and canvases of every component of a design.
 
-    The origin counts as construction geometry. Each kind is hidden by turning off its folder in the
-    component's browser, so the solids are all that's left in a picture of the design.
+    The origin counts as construction geometry. Sketches, construction geometry and joints are hidden by
+    turning off their folders in the component's browser, and each visible canvas is hidden on its own.
+    That leaves the solids as all that's in a picture of the design.
     Returns what was turned off, so show_again can put it back.
     """
     hidden = []
 
-    def turn_off(component):
+    def turn_off(entity, light_bulb):
+        try:
+            if getattr(entity, light_bulb):
+                setattr(entity, light_bulb, False)
+                hidden.append((entity, light_bulb))
+        except (AttributeError, RuntimeError):
+            # Some entities can't be changed, such as those in referenced components
+            pass
+
+    def hide_in(component):
         for light_bulb in NON_SOLID_FOLDERS:
-            try:
-                if getattr(component, light_bulb):
-                    setattr(component, light_bulb, False)
-                    hidden.append((component, light_bulb))
-            except (AttributeError, RuntimeError):
-                # Some components can't be changed, such as referenced ones
-                pass
+            turn_off(component, light_bulb)
+        try:
+            for canvas in component.canvases:
+                turn_off(canvas, 'isLightBulbOn')
+        except (AttributeError, RuntimeError):
+            pass
 
     root = design.rootComponent
-    turn_off(root)
+    hide_in(root)
     for occurrence in root.allOccurrences:
-        turn_off(occurrence.component)
+        hide_in(occurrence.component)
 
     return hidden
 
