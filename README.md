@@ -22,6 +22,7 @@ Project Archiver is an add-in for Autodesk Fusion that exports the designs, draw
 - Exports every **electronics** schematic, board and library to EAGLE .sch, .brd and .lbr files.
 - Archives a **folder**, a whole **project**, or the projects you choose from a **hub**.
 - Exports the latest version of each design, or **every version**.
+- Saves an 800 x 800 **thumbnail** image of each design, named like its other exports.
 - Keeps the hub, project and folder structure, and makes names safe to use as file names on Windows and macOS.
 - Closes each design after exporting it, so even large projects don't run Fusion out of memory.
 - Shows **progress** with a Cancel button, and can pick up where a cancelled export stopped.
@@ -110,8 +111,9 @@ The projects are exported one at a time, each into its own folder with its own l
 | **Drawing export types** | PDF | Formats for each drawing: **PDF**, **DXF** and **DWG**. Each drawing exports to one file per type, with every sheet in it. Uncheck them all to skip drawings. |
 | **Export electronics documents?** | On | Exports each schematic as .sch, each board as .brd and each library as .lbr (EAGLE 9.6.2 formats). Only shown when your version of Fusion can export electronics documents. |
 | **File name option** | Document name | How exported designs are named: by **Document name**, or by the root component's **Description** or **Part number**. If the description or part number is empty, the document name is used. Drawings and electronics documents always use the document name. |
+| **Export Thumbnail** | Off | Saves an 800 x 800 PNG picture of each design in the same folder as the design's other exports, named the same way, for example `Bracket.png` next to `Bracket.step`. See Thumbnails under [What you get](#what-you-get). Drawings and electronics documents don't get thumbnails. |
 
-**OK** is only available when at least one export type is selected.
+**OK** is only available when at least one export type is selected, or **Export Thumbnail** is checked.
 
 ### Advanced options
 
@@ -127,6 +129,7 @@ Click **Advanced options** to see these.
 | **Existing files** | Skip existing files | What to do when a file with the same name is already there: **Skip existing files**, **Rename with -dup** (adds `-dup` to the new file's name) or **Overwrite**. Skipping makes it quick to rerun an export, for example to finish one you cancelled: designs whose files all exist aren't even opened when they're named by document name. |
 | **Skip designs used by other designs?** | Off | Only exports designs that aren't inserted into another design, such as top-level assemblies. A drawing of a design doesn't count as using it. |
 | **Include hidden bodies and components?** | Off | Before exporting STEP, IGES, SAT, SMT and STL, shows every hidden body and component at every level of the design, so they're included. F3D files always keep hidden geometry, still hidden. Designs you already had open are hidden again afterward. |
+| **Unhide bodies for thumbnails?** | Off | Only used with **Export Thumbnail**. Shows hidden bodies and components in the thumbnails, and only in the thumbnails: the exported files and your designs are not affected. It doesn't depend on **Include hidden bodies and components?**. |
 | **Open Text Commands?** | Off | Opens Fusion's Text Commands window when the export starts, where each file is listed as it's exported. |
 
 ## What you get
@@ -141,6 +144,10 @@ Every export command uses this layout. Export active folder puts a folder's file
 
 **File names.** Characters that aren't allowed in file names on Windows or macOS (`\ / : * ? " < > |`) become `-`. Trailing spaces and periods are removed, and Windows reserved names such as `CON` get a `-` added. Hub, project, folder and design names are all cleaned up this way, the same on every computer, so an archive can move between Windows and macOS. For example, a design named `Bracket 1/8" thick` exports as `Bracket 1-8- thick.step`.
 
+**Thumbnails.** With **Export Thumbnail** checked, each design is also saved as an 800 x 800 PNG in the same folder as its other exports, with the same name apart from the extension. It follows **File name option**, **Write versions to output file names?** and **Existing files** like the other files do, so `Bracket v4.step` gets `Bracket v4.png`. A thumbnail needs the design to be opened in Fusion's viewport, so with **Skip existing files** a design is only skipped when its thumbnail exists too. You can export only thumbnails by unchecking every design export type.
+
+Each thumbnail shows the design from an isometric angle, fitted to the picture. Sketches, construction geometry (including the origin), joints and canvases are hidden so the picture shows the solids. Hidden bodies and components stay hidden unless **Unhide bodies for thumbnails?** is checked. Taking a thumbnail changes what's visible in the open design for a moment; the add-in puts it back, never saves the design, and turns off Fusion's save on close and automatic versioning until the export ends, so no version is created. Designs you already had open are put back as they were, including the view.
+
 **Logs.** Each project folder has a **Project-Archiver-log.txt** listing every file with what was written, or why it was skipped or failed, along with the options used. Each export adds to the end of the log, so reruns keep their history. A hub export also writes a short log in the hub folder with each project's totals. If you're helping someone with an archive, ask for these files first.
 
 **Your open documents.** Documents you had open before the export stay open. Everything the export opened is closed again.
@@ -152,6 +159,7 @@ Every export command uses this layout. Export active folder puts a folder's file
 - **Memory.** Each design is closed right after it's exported. Designs that an assembly references load in the background, without their own tab, and Fusion sometimes keeps them loaded until the export finishes. A single very large design still needs its own memory while it's open.
 - **Older versions of open designs.** With **Export all versions**, Fusion can't open an older version of a design while that design is open, either in a tab or in the background for an assembly. Those versions are listed as could not be opened. Close the design and export again with **Skip existing files** to fill them in.
 - **Preview features.** DXF and DWG drawing export and electronics export use Fusion API features that are still in preview and may change. If one isn't available in your version of Fusion or fails, it's listed in the summary and the rest of the export continues.
+- **Thumbnails are slower.** Each thumbnail is drawn by Fusion's viewport, so the design has to be opened and displayed, and the export is slower than writing the other formats. Drawings and electronics documents don't get thumbnails. If a thumbnail can't be saved, it's listed in the summary and the log and the rest of the export continues.
 - **What isn't exported.** Other file types in a project, such as uploaded PDFs or non-Fusion CAD files, aren't exported; the log lists them. An electronics design (.fprj) isn't exported separately, because its schematic and board are separate files in the same folder.
 
 ## Troubleshooting
@@ -179,6 +187,7 @@ Project Archiver is built on Fusion's standard Python add-in template and has no
 | `Project-Archiver/commands/` | One folder per command (`exportProject`, `exportFolder`, `exportHub`, `closeAll`), each with its icons |
 | `Project-Archiver/lib/archiverUtils/` | The export itself. Start with `exporter.py`, which explains the steps of an export, and `document_utils.py`, which covers the Fusion behavior the export works around. `export_dialog.py` is the dialog the export commands share. |
 | `Project-Archiver/lib/fusionAddInUtils/` | Event and logging helpers from the template |
+| `tests/` | Optional checks that run without Fusion, using a small stand-in for the Fusion API. Run them from the repo root with `python3 -m unittest discover -s tests`. They aren't part of the add-in download. |
 
 See [Python add-in template](https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-DF32F126-366B-45C0-88B0-CEB46F5A9BE8) in the Fusion API documentation for how the template is organized.
 

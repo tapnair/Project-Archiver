@@ -36,11 +36,12 @@ try:
 except ImportError:
     HAS_DRAWING = False
 
+from ... import config
 from . import document_utils
 from .export_options import (DESIGN_EXTENSIONS, DESIGN_FILE_EXTENSION, DRAWING_EXPORTS, DRAWING_FILE_EXTENSION,
                              ELECTRONICS_EXPORTS, EXISTING_FILES_OVERWRITE, EXISTING_FILES_SKIP,
                              EXPORTED_FILE_EXTENSIONS, NAME_DESCRIPTION, NAME_DOCUMENT, NAME_PART_NUMBER,
-                             ExportOptions, ExportResults)
+                             THUMBNAIL_EXTENSION, THUMBNAIL_SIZE, ExportOptions, ExportResults)
 from .file_utils import dup_check, get_output_folder, sanitize_name
 from .log_utils import LOG_FILE_NAME, end_log, log, start_log
 
@@ -58,14 +59,16 @@ def export(options: ExportOptions):
     """Export a project or folder. Close all documents finishes it by calling finish_export."""
     global pending_export
     pending_export = Exporter(options)
-    pending_export.run()
+    with document_utils.suspended_auto_save(options.export_thumbnail):
+        pending_export.run()
 
 
 def export_hub(options: ExportOptions, projects):
     """Export several projects of a hub. Close all documents finishes it by calling finish_export."""
     global pending_export
     pending_export = HubExporter(options, projects)
-    pending_export.run()
+    with document_utils.suspended_auto_save(options.export_thumbnail):
+        pending_export.run()
 
 
 def get_keep_version_ids():
@@ -143,10 +146,12 @@ class Exporter:
             'Drawing export types: {}'.format(', '.join(options.drawing_types) or 'none'),
             'Export electronics documents: {}'.format(yes_no(HAS_ELECTRON and options.export_electronics)),
             'File name option: {}{}'.format(options.name_option, ', with versions' if options.write_version else ''),
+            'Export thumbnail: {}'.format(yes_no(options.export_thumbnail)),
             'Preserve folder structure: {}'.format(yes_no(options.preserve_folders)),
             'Existing files: {}'.format(options.existing_files),
             'Skip designs used by other designs: {}'.format(yes_no(options.skip_used_designs)),
             'Include hidden bodies and components: {}'.format(yes_no(options.include_hidden)),
+            'Unhide bodies for thumbnails: {}'.format(yes_no(options.unhide_for_thumbnails)),
             'Export all versions: {}'.format(yes_no(options.all_versions)),
         ])
 
@@ -180,7 +185,7 @@ class Exporter:
         for data_file in data_folder.dataFiles:
             extension = data_file.fileExtension
 
-            if extension == DESIGN_FILE_EXTENSION and options.design_types:
+            if extension == DESIGN_FILE_EXTENSION and (options.design_types or options.export_thumbnail):
                 for version in document_utils.get_versions(data_file, options.all_versions):
                     exports.append((self.export_design_file, version, output_folder))
 
@@ -285,6 +290,8 @@ class Exporter:
         if options.name_option == NAME_DOCUMENT:
             extensions = [extension for type_name, extension in DESIGN_EXTENSIONS.items()
                           if type_name in options.design_types and not (type_name == 'F3D' and skip_f3d)]
+            if options.export_thumbnail:
+                extensions.append(THUMBNAIL_EXTENSION)
             if self.all_exports_exist(data_file, output_folder, extensions):
                 return
 
@@ -360,6 +367,10 @@ class Exporter:
         export_mgr = design.exportManager
         output_name = self.get_design_name(design)
 
+        # The thumbnail goes first and puts back everything it changes, so it doesn't affect the other types
+        if options.export_thumbnail:
+            self.export_thumbnail(design, folder, output_name)
+
         # Designs that reference other designs aren't exported as F3D; export_design_file records them.
         # The data file is checked rather than document.allDocumentReferences, which raises an error
         # when the design was loaded in the background by an assembly.
@@ -395,6 +406,61 @@ class Exporter:
             # Exported documents are closed without saving, but one the user already had open stays open
             if shown and document_utils.get_version_id(document) in self.open_before_export:
                 document_utils.hide_again(shown)
+
+    def export_thumbnail(self, design, folder, output_name):
+        """Save a PNG of the active design, in an isometric view with the whole design in it.
+
+        Sketches, construction geometry and joints are hidden so the solids are what's shown, and with
+        unhide_for_thumbnails the hidden bodies and components are shown. The design's visibility and the
+        view are put back afterward, so nothing the user had open is left changed. The design is never
+        saved, and a failure is recorded without stopping the design's other exports.
+        """
+        export_name = None
+        shown = []
+        hidden = []
+        viewport = None
+        original_camera = None
+
+        try:
+            # Preparing the path can fail too, such as removing a file that can't be overwritten
+            export_name = self.get_export_path(folder + output_name + THUMBNAIL_EXTENSION)
+            if export_name is None:
+                return
+
+            if ui.activeWorkspace.id != config.DESIGN_WORKSPACE_ID:
+                ui.workspaces.itemById(config.DESIGN_WORKSPACE_ID).activate()
+
+            viewport = app.activeViewport
+            original_camera = viewport.camera
+
+            if self.options.unhide_for_thumbnails:
+                shown = document_utils.show_hidden_geometry(design)
+            hidden = document_utils.hide_non_solid_geometry(design)
+
+            camera = viewport.camera
+            camera.isSmoothTransition = False
+            camera.viewOrientation = adsk.core.ViewOrientations.IsoTopRightViewOrientation
+            viewport.camera = camera
+            viewport.fit()
+
+            # Let Fusion draw the changes before the image is taken
+            adsk.doEvents()
+
+            if not viewport.saveAsImageFile(export_name, THUMBNAIL_SIZE, THUMBNAIL_SIZE):
+                self.record_type_failure('{}: thumbnail export failed'.format(output_name), export_name)
+
+        except Exception as e:
+            self.record_type_failure('{}: thumbnail export error: {}'.format(output_name, e), export_name)
+
+        finally:
+            document_utils.show_again(hidden)
+            document_utils.hide_again(shown)
+            if original_camera is not None:
+                try:
+                    original_camera.isSmoothTransition = False
+                    viewport.camera = original_camera
+                except RuntimeError:
+                    pass
 
     def export_drawing(self, document, folder):
         """Export a drawing to each selected drawing type. Each type is one file containing every sheet.

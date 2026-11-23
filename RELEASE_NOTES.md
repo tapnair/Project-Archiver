@@ -1,5 +1,11 @@
 # Release notes
 
+## 3.1.0
+
+### New
+
+- **Export thumbnails.** A new **Export Thumbnail** option saves an 800 x 800 PNG of each design next to its other exports, named by the File name option, with or without the version. Sketches, construction geometry and joints are hidden so the picture shows the solids. An optional **Unhide bodies for thumbnails?** setting shows hidden bodies and components in the thumbnails only. Designs are never saved with the changes. ([#60](https://github.com/tapnair/Project-Archiver/issues/60))
+
 ## 3.0.0
 
 Project Archiver 3.0.0 is a rebuild of the add-in on Fusion's standard Python add-in template, with new export types and options, and fixes for most of the problems reported since 2.1.0. See the [README](README.md) for how to install and use it.

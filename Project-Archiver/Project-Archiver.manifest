@@ -6,7 +6,7 @@
 	"description":	{
 		"":	"Archive the designs, drawings and electronics documents in Fusion projects, folders and hubs as STEP, F3D, PDF and other local files."
 	},
-	"version":	"3.0.0",
+	"version":	"3.1.0",
 	"runOnStartup":	false,
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true,

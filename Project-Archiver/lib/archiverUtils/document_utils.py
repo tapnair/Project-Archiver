@@ -12,12 +12,25 @@ so this module collects what's been learned:
 - Opening a design that references other designs also loads those designs in the background,
   without a tab of their own. They can stay loaded after the design closes.
 - Every version of a data file has the same id; only the version id tells them apart.
+- Changing a design, even only what's visible, makes Fusion treat it as modified. Exported documents
+  are closed without saving, but Fusion's own saving and versioning is turned off while thumbnails
+  change what's visible.
 """
+
+import contextlib
 
 import adsk.core
 import adsk.fusion
 
 app = adsk.core.Application.get()
+
+# The Component properties that show a folder of non-solid geometry in the browser. Canvases have no
+# folder property, so each canvas is hidden on its own.
+NON_SOLID_FOLDERS = ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn',
+                     'isJointsFolderLightBulbOn', 'isJointOriginsFolderLightBulbOn')
+
+# The General preferences that let Fusion save a document by itself
+AUTO_SAVE_PREFERENCES = ('isAutomaticSaveOnCloseEnabled', 'isAutomaticVersioningEnabled')
 
 
 def get_active_hub():
@@ -239,3 +252,87 @@ def hide_again(shown):
             setattr(entity, light_bulb, False)
         except RuntimeError:
             pass
+
+
+def hide_non_solid_geometry(design):
+    """Hide the sketches, construction geometry, joints and canvases of every component of a design.
+
+    The origin counts as construction geometry. Sketches, construction geometry and joints are hidden by
+    turning off their folders in the component's browser, and each visible canvas is hidden on its own.
+    That leaves the solids as all that's in a picture of the design.
+    Returns what was turned off, so show_again can put it back.
+    """
+    hidden = []
+
+    def turn_off(entity, light_bulb):
+        try:
+            if getattr(entity, light_bulb):
+                setattr(entity, light_bulb, False)
+                hidden.append((entity, light_bulb))
+        except (AttributeError, RuntimeError):
+            # Some entities can't be changed, such as those in referenced components
+            pass
+
+    def hide_in(component):
+        for light_bulb in NON_SOLID_FOLDERS:
+            turn_off(component, light_bulb)
+        try:
+            for canvas in component.canvases:
+                turn_off(canvas, 'isLightBulbOn')
+        except (AttributeError, RuntimeError):
+            pass
+
+    root = design.rootComponent
+    hide_in(root)
+    for occurrence in root.allOccurrences:
+        hide_in(occurrence.component)
+
+    return hidden
+
+
+def show_again(hidden):
+    """Show what hide_non_solid_geometry turned off."""
+    for entity, light_bulb in reversed(hidden):
+        try:
+            setattr(entity, light_bulb, True)
+        except RuntimeError:
+            pass
+
+
+@contextlib.contextmanager
+def suspended_auto_save(enabled=True):
+    """Turn off Fusion's automatic saving on close and automatic versioning, and put them back afterward.
+
+    Thumbnails change what's visible in a design, which Fusion counts as a modification. Without this,
+    it could save a version of the design with the change. Each setting's original value is recorded
+    before it's changed, and exactly that value is restored in a finally, so a setting that was already
+    off stays off, and the settings come back even if the export fails or is cancelled. If Fusion doesn't
+    allow a setting to be read or changed, it's left alone.
+    """
+    preferences = None
+    originals = {}
+
+    try:
+        try:
+            preferences = app.preferences.generalPreferences if enabled else None
+        except (AttributeError, RuntimeError):
+            pass
+
+        if preferences is not None:
+            for preference in AUTO_SAVE_PREFERENCES:
+                try:
+                    original = getattr(preferences, preference)
+                    if original:
+                        setattr(preferences, preference, False)
+                        originals[preference] = original
+                except (AttributeError, RuntimeError):
+                    pass
+
+        yield originals
+
+    finally:
+        for preference, original in originals.items():
+            try:
+                setattr(preferences, preference, original)
+            except (AttributeError, RuntimeError):
+                pass

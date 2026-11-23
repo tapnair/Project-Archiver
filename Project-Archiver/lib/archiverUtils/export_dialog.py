@@ -15,7 +15,7 @@ import adsk.core
 from ... import config
 from . import exporter
 from .export_options import (DESIGN_EXTENSIONS, DRAWING_EXPORTS, EXISTING_FILES_OPTIONS, EXISTING_FILES_SKIP,
-                             NAME_DOCUMENT, NAME_OPTIONS, ExportOptions)
+                             NAME_DOCUMENT, NAME_OPTIONS, THUMBNAIL_SIZE, ExportOptions)
 from .file_utils import get_home_folder, get_output_folder, sanitize_name
 from .log_utils import LOG_FILE_NAME
 
@@ -86,6 +86,10 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
     for option in NAME_OPTIONS:
         name_option_input.listItems.add(option, option == NAME_DOCUMENT)
 
+    thumbnail_input = inputs.addBoolValueInput('export_thumbnail', 'Export Thumbnail', True, '', False)
+    thumbnail_input.tooltip = ('Save an {0} x {0} PNG image of each design, named like its other exported files'
+                               .format(THUMBNAIL_SIZE))
+
     # Options most users don't need to change, collapsed by default
     advanced_group = inputs.addGroupCommandInput('advanced_options', 'Advanced options')
     advanced_group.isExpanded = False
@@ -114,6 +118,12 @@ def add_export_inputs(inputs: adsk.core.CommandInputs, location_label: str, loca
                                                      '', False)
     hidden_input.tooltip = ('Show every hidden body and component at every level before exporting, so they\'re '
                             'included. F3D files always include them, hidden as in the design.')
+
+    unhide_input = advanced_inputs.addBoolValueInput('unhide_for_thumbnails', 'Unhide bodies for thumbnails?', True,
+                                                     '', False)
+    unhide_input.tooltip = ('Show hidden bodies and components in the thumbnails only. Used with Export Thumbnail. '
+                            'The designs are never saved with this change, and it\'s separate from '
+                            'including hidden bodies and components in the exported files.')
 
     text_commands_input = advanced_inputs.addBoolValueInput('open_text_commands', 'Open Text Commands?', True, '',
                                                             False)
@@ -186,11 +196,13 @@ def get_export_options(inputs: adsk.core.CommandInputs, data_folder: adsk.core.D
         drawing_types=selected('drawing_types') if exporter.HAS_DRAWING else [],
         export_electronics=value('export_electronics'),
         name_option=selected_one('name_option'),
+        export_thumbnail=value('export_thumbnail'),
         write_version=value('write_version'),
         preserve_folders=value('preserve_folders'),
         existing_files=selected_one('existing_files'),
         skip_used_designs=value('skip_used_designs'),
         include_hidden=value('include_hidden'),
+        unhide_for_thumbnails=value('unhide_for_thumbnails'),
         all_versions=value('all_versions'),
         data_folder=data_folder,
     )
@@ -279,7 +291,7 @@ def inputs_are_valid(inputs: adsk.core.CommandInputs) -> bool:
         return False
 
     options = get_export_options(inputs)
-    return bool(options.design_types or options.drawing_types
+    return bool(options.design_types or options.drawing_types or options.export_thumbnail
                 or (exporter.HAS_ELECTRON and options.export_electronics))
 
 
