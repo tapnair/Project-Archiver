@@ -291,35 +291,38 @@ def show_again(hidden):
 
 @contextlib.contextmanager
 def suspended_auto_save(enabled=True):
-    """Turn off Fusion's automatic saving on close and automatic versioning, and turn them back on afterward.
+    """Turn off Fusion's automatic saving on close and automatic versioning, and put them back afterward.
 
     Thumbnails change what's visible in a design, which Fusion counts as a modification. Without this,
-    it could save a version of the design with the change. The preferences are restored even if the
-    export fails. If Fusion doesn't allow them to be read or changed, nothing is suspended.
+    it could save a version of the design with the change. Each setting's original value is recorded
+    before it's changed, and exactly that value is restored in a finally, so a setting that was already
+    off stays off, and the settings come back even if the export fails or is cancelled. If Fusion doesn't
+    allow a setting to be read or changed, it's left alone.
     """
     preferences = None
-    suspended = []
+    originals = {}
 
     try:
-        preferences = app.preferences.generalPreferences if enabled else None
-    except (AttributeError, RuntimeError):
-        pass
+        try:
+            preferences = app.preferences.generalPreferences if enabled else None
+        except (AttributeError, RuntimeError):
+            pass
 
-    if preferences is not None:
-        for preference in AUTO_SAVE_PREFERENCES:
-            try:
-                if getattr(preferences, preference):
-                    setattr(preferences, preference, False)
-                    suspended.append(preference)
-            except (AttributeError, RuntimeError):
-                pass
+        if preferences is not None:
+            for preference in AUTO_SAVE_PREFERENCES:
+                try:
+                    original = getattr(preferences, preference)
+                    if original:
+                        setattr(preferences, preference, False)
+                        originals[preference] = original
+                except (AttributeError, RuntimeError):
+                    pass
 
-    try:
-        yield suspended
+        yield originals
 
     finally:
-        for preference in suspended:
+        for preference, original in originals.items():
             try:
-                setattr(preferences, preference, True)
+                setattr(preferences, preference, original)
             except (AttributeError, RuntimeError):
                 pass

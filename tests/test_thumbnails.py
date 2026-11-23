@@ -554,67 +554,155 @@ class ThumbnailExportTests(unittest.TestCase):
 
 
 class AutoSaveTests(unittest.TestCase):
+    PREFERENCES = ('isAutomaticSaveOnCloseEnabled', 'isAutomaticVersioningEnabled')
+
     def setUp(self):
         fake_app.reset()
         self.preferences = fake_app.preferences.generalPreferences
 
-    def test_auto_save_and_versioning_are_off_during_the_export_and_restored_after(self):
-        seen = []
-        with document_utils.suspended_auto_save():
-            seen.append((self.preferences.isAutomaticSaveOnCloseEnabled,
-                         self.preferences.isAutomaticVersioningEnabled))
-
-        self.assertEqual(seen, [(False, False)])
-        self.assertTrue(self.preferences.isAutomaticSaveOnCloseEnabled)
-        self.assertTrue(self.preferences.isAutomaticVersioningEnabled)
-
-    def test_preferences_are_restored_when_the_export_fails(self):
-        with self.assertRaises(ValueError):
-            with document_utils.suspended_auto_save():
-                raise ValueError('export failed')
-
-        self.assertTrue(self.preferences.isAutomaticSaveOnCloseEnabled)
-        self.assertTrue(self.preferences.isAutomaticVersioningEnabled)
-
-    def test_a_preference_that_was_already_off_stays_off(self):
-        self.preferences.isAutomaticVersioningEnabled = False
+    def set_preferences(self, save_on_close, versioning):
+        self.preferences.isAutomaticSaveOnCloseEnabled = save_on_close
+        self.preferences.isAutomaticVersioningEnabled = versioning
         self.preferences.history.clear()
 
-        with document_utils.suspended_auto_save():
-            pass
+    def current(self):
+        return tuple(getattr(self.preferences, name) for name in self.PREFERENCES)
 
-        self.assertFalse(self.preferences.isAutomaticVersioningEnabled)
-        self.assertNotIn(('isAutomaticVersioningEnabled', True), self.preferences.history)
-
-    def test_preferences_are_left_alone_without_thumbnails(self):
-        self.preferences.history.clear()
-
-        with document_utils.suspended_auto_save(False):
-            pass
-
-        self.assertEqual(self.preferences.history, [])
-
-    def test_export_suspends_auto_save_only_while_it_runs(self):
-        seen = []
-
+    def run_export(self, options, run, hub=False):
+        """Run exporter.export (or export_hub) with an Exporter whose run does something chosen by the test."""
         class FakeExporter:
-            def __init__(self, options):
+            def __init__(self, *args):
                 pass
 
             def run(self):
-                seen.append(self_prefs.isAutomaticVersioningEnabled)
+                run()
 
-        self_prefs = self.preferences
-        original = exporter.Exporter
-        exporter.Exporter = FakeExporter
+        original = exporter.Exporter, exporter.HubExporter
+        exporter.Exporter = exporter.HubExporter = FakeExporter
         try:
-            exporter.export(export_options.ExportOptions(output_folder='/out/', export_thumbnail=True))
+            if hub:
+                exporter.export_hub(options, [])
+            else:
+                exporter.export(options)
         finally:
-            exporter.Exporter = original
+            exporter.Exporter, exporter.HubExporter = original
             exporter.pending_export = None
 
-        self.assertEqual(seen, [False])
-        self.assertTrue(self.preferences.isAutomaticVersioningEnabled)
+    def thumbnails(self):
+        return export_options.ExportOptions(output_folder='/out/', export_thumbnail=True)
+
+    def test_each_combination_is_off_during_the_export_and_back_as_it_was_after(self):
+        for original in ((True, True), (False, False), (True, False), (False, True)):
+            with self.subTest(original=original):
+                self.set_preferences(*original)
+                seen = []
+
+                with document_utils.suspended_auto_save():
+                    seen.append(self.current())
+
+                self.assertEqual(seen, [(False, False)])
+                self.assertEqual(self.current(), original)
+
+    def test_a_preference_that_was_already_off_is_never_written(self):
+        self.set_preferences(True, False)
+
+        with document_utils.suspended_auto_save():
+            pass
+
+        self.assertEqual(self.preferences.history, [
+            ('isAutomaticSaveOnCloseEnabled', False), ('isAutomaticSaveOnCloseEnabled', True)])
+
+    def test_each_combination_is_restored_when_the_export_raises(self):
+        for original in ((True, True), (False, False), (True, False), (False, True)):
+            with self.subTest(original=original):
+                self.set_preferences(*original)
+
+                def fail():
+                    self.assertEqual(self.current(), (False, False))
+                    raise ValueError('export failed')
+
+                with self.assertRaises(ValueError):
+                    self.run_export(self.thumbnails(), fail)
+
+                self.assertEqual(self.current(), original)
+
+    def test_hub_export_restores_after_an_exception(self):
+        self.set_preferences(True, True)
+
+        def fail():
+            raise ValueError('export failed')
+
+        with self.assertRaises(ValueError):
+            self.run_export(self.thumbnails(), fail, hub=True)
+
+        self.assertEqual(self.current(), (True, True))
+
+    def test_cancelled_export_restores_the_preferences(self):
+        # A cancelled export stops between files and returns normally; the user closing the
+        # dialog with Cancel at the progress dialog never leaves run
+        for original in ((True, True), (True, False)):
+            with self.subTest(original=original):
+                self.set_preferences(*original)
+                seen = []
+
+                self.run_export(self.thumbnails(), lambda: seen.append(self.current()))
+
+                self.assertEqual(seen, [(False, False)])
+                self.assertEqual(self.current(), original)
+
+    def test_preferences_are_restored_when_the_export_is_interrupted(self):
+        self.set_preferences(True, True)
+
+        def interrupt():
+            raise KeyboardInterrupt
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_export(self.thumbnails(), interrupt)
+
+        self.assertEqual(self.current(), (True, True))
+
+    def test_a_failure_while_turning_them_off_restores_the_one_already_off(self):
+        self.set_preferences(True, True)
+
+        class Failing(FakePreferences):
+            def __setattr__(self, name, value):
+                if name == 'isAutomaticVersioningEnabled' and value is False:
+                    raise ValueError('unexpected')
+                FakePreferences.__setattr__(self, name, value)
+
+        failing = Failing()
+        failing.history = []
+        fake_app.preferences = types.SimpleNamespace(generalPreferences=failing)
+
+        with self.assertRaises(ValueError):
+            with document_utils.suspended_auto_save():
+                self.fail('the export must not start')
+
+        self.assertTrue(failing.isAutomaticSaveOnCloseEnabled)
+        self.assertTrue(failing.isAutomaticVersioningEnabled)
+
+    def test_preferences_are_left_alone_without_thumbnails(self):
+        self.set_preferences(True, True)
+
+        with document_utils.suspended_auto_save(False):
+            pass
+        self.run_export(export_options.ExportOptions(output_folder='/out/'), lambda: None)
+
+        self.assertEqual(self.preferences.history, [])
+        self.assertEqual(self.current(), (True, True))
+
+    def test_preferences_that_cannot_be_read_are_skipped(self):
+        class Unreadable:
+            def __getattr__(self, name):
+                raise RuntimeError('not available')
+
+        fake_app.preferences = types.SimpleNamespace(generalPreferences=Unreadable())
+        ran = []
+
+        with document_utils.suspended_auto_save():
+            ran.append(True)
+
+        self.assertEqual(ran, [True])
 
 
 if __name__ == '__main__':
