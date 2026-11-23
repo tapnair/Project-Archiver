@@ -39,6 +39,10 @@ ELECTRONICS_EXPORTS = {
     'flbr': ('createEagleLbrExportOptions', '.lbr'),
 }
 
+# Thumbnails are square PNG images of a design, saved next to its other exports
+THUMBNAIL_EXTENSION = '.png'
+THUMBNAIL_SIZE = 800
+
 # Data file extensions this add-in can export
 DESIGN_FILE_EXTENSION = 'f3d'
 DRAWING_FILE_EXTENSION = 'f2d'
@@ -54,11 +58,13 @@ class ExportOptions:
     drawing_types: list = field(default_factory=list)   # names from DRAWING_EXPORTS, such as 'PDF'
     export_electronics: bool = True
     name_option: str = NAME_DOCUMENT
+    export_thumbnail: bool = False
     write_version: bool = False
     preserve_folders: bool = True
     existing_files: str = EXISTING_FILES_SKIP
     skip_used_designs: bool = False
     include_hidden: bool = False
+    unhide_for_thumbnails: bool = False
     all_versions: bool = False
 
     # The project to export, or None for the active project

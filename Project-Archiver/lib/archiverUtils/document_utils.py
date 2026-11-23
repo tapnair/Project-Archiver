@@ -12,12 +12,24 @@ so this module collects what's been learned:
 - Opening a design that references other designs also loads those designs in the background,
   without a tab of their own. They can stay loaded after the design closes.
 - Every version of a data file has the same id; only the version id tells them apart.
+- Changing a design, even only what's visible, makes Fusion treat it as modified. Exported documents
+  are closed without saving, but Fusion's own saving and versioning is turned off while thumbnails
+  change what's visible.
 """
+
+import contextlib
 
 import adsk.core
 import adsk.fusion
 
 app = adsk.core.Application.get()
+
+# The Component properties that show a folder of non-solid geometry in the browser
+NON_SOLID_FOLDERS = ('isSketchFolderLightBulbOn', 'isConstructionFolderLightBulbOn', 'isOriginFolderLightBulbOn',
+                     'isJointsFolderLightBulbOn', 'isJointOriginsFolderLightBulbOn', 'isCanvasFolderLightBulbOn')
+
+# The General preferences that let Fusion save a document by itself
+AUTO_SAVE_PREFERENCES = ('isAutomaticSaveOnCloseEnabled', 'isAutomaticVersioningEnabled')
 
 
 def get_active_hub():
@@ -239,3 +251,75 @@ def hide_again(shown):
             setattr(entity, light_bulb, False)
         except RuntimeError:
             pass
+
+
+def hide_non_solid_geometry(design):
+    """Hide the sketches, construction geometry, joints and canvases of every component of a design.
+
+    The origin counts as construction geometry. Each kind is hidden by turning off its folder in the
+    component's browser, so the solids are all that's left in a picture of the design.
+    Returns what was turned off, so show_again can put it back.
+    """
+    hidden = []
+
+    def turn_off(component):
+        for light_bulb in NON_SOLID_FOLDERS:
+            try:
+                if getattr(component, light_bulb):
+                    setattr(component, light_bulb, False)
+                    hidden.append((component, light_bulb))
+            except (AttributeError, RuntimeError):
+                # Some components can't be changed, such as referenced ones
+                pass
+
+    root = design.rootComponent
+    turn_off(root)
+    for occurrence in root.allOccurrences:
+        turn_off(occurrence.component)
+
+    return hidden
+
+
+def show_again(hidden):
+    """Show what hide_non_solid_geometry turned off."""
+    for entity, light_bulb in reversed(hidden):
+        try:
+            setattr(entity, light_bulb, True)
+        except RuntimeError:
+            pass
+
+
+@contextlib.contextmanager
+def suspended_auto_save(enabled=True):
+    """Turn off Fusion's automatic saving on close and automatic versioning, and turn them back on afterward.
+
+    Thumbnails change what's visible in a design, which Fusion counts as a modification. Without this,
+    it could save a version of the design with the change. The preferences are restored even if the
+    export fails. If Fusion doesn't allow them to be read or changed, nothing is suspended.
+    """
+    preferences = None
+    suspended = []
+
+    try:
+        preferences = app.preferences.generalPreferences if enabled else None
+    except (AttributeError, RuntimeError):
+        pass
+
+    if preferences is not None:
+        for preference in AUTO_SAVE_PREFERENCES:
+            try:
+                if getattr(preferences, preference):
+                    setattr(preferences, preference, False)
+                    suspended.append(preference)
+            except (AttributeError, RuntimeError):
+                pass
+
+    try:
+        yield suspended
+
+    finally:
+        for preference in suspended:
+            try:
+                setattr(preferences, preference, True)
+            except (AttributeError, RuntimeError):
+                pass
